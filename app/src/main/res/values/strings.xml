@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Duplicate Finder</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_scan">Scan</string>
+    <string name="nav_duplicates">Duplicates</string>
+    <string name="nav_trash">Trash</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Home Screen -->
+    <string name="home_title">Find Duplicates</string>
+    <string name="home_subtitle">Free up space by removing duplicate photos</string>
+    <string name="home_start_scan">Start Scan</string>
+    <string name="home_total_images">Total Images</string>
+    <string name="home_duplicates_found">Duplicates Found</string>
+    <string name="home_space_recoverable">Space Recoverable</string>
+    <string name="home_last_scan">Last Scan</string>
+    <string name="home_never_scanned">Never</string>
+
+    <!-- Scan Screen -->
+    <string name="scan_title">Scanning</string>
+    <string name="scan_loading">Loading images…</string>
+    <string name="scan_hashing">Calculating hashes…</string>
+    <string name="scan_comparing">Finding duplicates…</string>
+    <string name="scan_complete">Scan Complete</string>
+    <string name="scan_progress">%1$d of %2$d</string>
+    <string name="scan_cancel">Cancel</string>
+    <string name="scan_view_results">View Results</string>
+
+    <!-- Duplicates Screen -->
+    <string name="duplicates_title">Duplicates</string>
+    <string name="duplicates_empty">No duplicates found</string>
+    <string name="duplicates_groups">%1$d groups found</string>
+    <string name="duplicates_select_all">Select All</string>
+    <string name="duplicates_deselect_all">Deselect All</string>
+    <string name="duplicates_delete_selected">Delete Selected</string>
+    <string name="duplicates_exact_match">Exact Match</string>
+    <string name="duplicates_similar">Similar</string>
+    <string name="duplicates_similarity">%1$.0f%% Similar</string>
+    <string name="duplicates_keep_original">Keep Original</string>
+    <string name="duplicates_potential_savings">Potential savings: %1$s</string>
+
+    <!-- Trash Screen -->
+    <string name="trash_title">Trash</string>
+    <string name="trash_empty">Trash is empty</string>
+    <string name="trash_items">%1$d items</string>
+    <string name="trash_restore">Restore</string>
+    <string name="trash_delete_permanently">Delete Permanently</string>
+    <string name="trash_empty_trash">Empty Trash</string>
+    <string name="trash_auto_delete">Items will be deleted after 30 days</string>
+    <string name="trash_deleted_on">Deleted on %1$s</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_scan_options">Scan Options</string>
+    <string name="settings_similarity_threshold">Similarity Threshold</string>
+    <string name="settings_similarity_description">Images with similarity above this will be marked as duplicates</string>
+    <string name="settings_include_folders">Include Folders</string>
+    <string name="settings_exclude_folders">Exclude Folders</string>
+    <string name="settings_trash_options">Trash Options</string>
+    <string name="settings_auto_delete_days">Auto-delete after days</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_dark_mode">Dark Mode</string>
+    <string name="settings_about">About</string>
+    <string name="settings_version">Version %1$s</string>
+
+    <!-- Dialogs -->
+    <string name="dialog_delete_title">Move to Trash?</string>
+    <string name="dialog_delete_message">%1$d images will be moved to trash. You can restore them within 30 days.</string>
+    <string name="dialog_delete_confirm">Move to Trash</string>
+    <string name="dialog_delete_permanent_title">Delete Permanently?</string>
+    <string name="dialog_delete_permanent_message">%1$d images will be permanently deleted. This action cannot be undone.</string>
+    <string name="dialog_delete_permanent_confirm">Delete</string>
+    <string name="dialog_cancel">Cancel</string>
+    <string name="dialog_restore_title">Restore Images?</string>
+    <string name="dialog_restore_message">%1$d images will be restored to their original location.</string>
+    <string name="dialog_restore_confirm">Restore</string>
+
+    <!-- Filters -->
+    <string name="filter_title">Filters</string>
+    <string name="filter_folders">Folders</string>
+    <string name="filter_date_range">Date Range</string>
+    <string name="filter_size">File Size</string>
+    <string name="filter_type">File Type</string>
+    <string name="filter_apply">Apply</string>
+    <string name="filter_reset">Reset</string>
+
+    <!-- Permissions -->
+    <string name="permission_required">Permission Required</string>
+    <string name="permission_media_message">This app needs access to your photos to find duplicates.</string>
+    <string name="permission_grant">Grant Permission</string>
+    <string name="permission_settings">Open Settings</string>
+
+    <!-- Errors -->
+    <string name="error_generic">Something went wrong</string>
+    <string name="error_no_images">No images found</string>
+    <string name="error_scan_failed">Scan failed</string>
+
+    <!-- File sizes -->
+    <string name="size_bytes">%1$d B</string>
+    <string name="size_kb">%1$.1f KB</string>
+    <string name="size_mb">%1$.1f MB</string>
+    <string name="size_gb">%1$.2f GB</string>
+</resources>
