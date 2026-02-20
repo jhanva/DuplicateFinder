@@ -10,6 +10,7 @@ import com.duplicatefinder.data.media.MediaStoreDataSource
 import com.duplicatefinder.domain.model.CachedImageHashes
 import com.duplicatefinder.domain.model.DuplicateGroup
 import com.duplicatefinder.domain.model.FilterCriteria
+import com.duplicatefinder.domain.model.ImageHashUpdate
 import com.duplicatefinder.domain.model.ImageItem
 import com.duplicatefinder.domain.model.MatchType
 import com.duplicatefinder.domain.model.ScanPhase
@@ -112,6 +113,23 @@ class ImageRepositoryImpl @Inject constructor(
         )
 
         imageHashDao.insert(entity)
+    }
+
+    override suspend fun saveHashes(updates: List<ImageHashUpdate>) {
+        if (updates.isEmpty()) return
+
+        val entities = updates.map { update ->
+            ImageHashEntity(
+                imageId = update.image.id,
+                path = update.image.path,
+                md5Hash = update.md5Hash,
+                perceptualHash = update.perceptualHash,
+                dateModified = update.image.dateModified,
+                size = update.image.size
+            )
+        }
+
+        imageHashDao.insertAll(entities)
     }
 
     override suspend fun findExactDuplicates(images: List<ImageItem>): List<DuplicateGroup> =

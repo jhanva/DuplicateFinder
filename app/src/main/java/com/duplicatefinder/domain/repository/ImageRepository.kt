@@ -3,6 +3,7 @@ package com.duplicatefinder.domain.repository
 import com.duplicatefinder.domain.model.CachedImageHashes
 import com.duplicatefinder.domain.model.DuplicateGroup
 import com.duplicatefinder.domain.model.FilterCriteria
+import com.duplicatefinder.domain.model.ImageHashUpdate
 import com.duplicatefinder.domain.model.ImageItem
 import com.duplicatefinder.domain.model.ScanProgress
 import kotlinx.coroutines.flow.Flow
@@ -23,6 +24,7 @@ interface ImageRepository {
     suspend fun getCachedHashes(imageIds: List<Long>): Map<Long, CachedImageHashes>
 
     suspend fun saveHash(image: ImageItem, md5Hash: String, perceptualHash: String?)
+    suspend fun saveHashes(updates: List<ImageHashUpdate>)
 
     suspend fun findExactDuplicates(images: List<ImageItem>): List<DuplicateGroup>
 
