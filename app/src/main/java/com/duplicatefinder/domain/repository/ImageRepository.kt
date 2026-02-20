@@ -1,5 +1,6 @@
 package com.duplicatefinder.domain.repository
 
+import com.duplicatefinder.domain.model.CachedImageHashes
 import com.duplicatefinder.domain.model.DuplicateGroup
 import com.duplicatefinder.domain.model.FilterCriteria
 import com.duplicatefinder.domain.model.ImageItem
@@ -19,9 +20,9 @@ interface ImageRepository {
 
     suspend fun calculatePerceptualHash(image: ImageItem): String?
 
-    suspend fun getCachedHash(imageId: Long): String?
+    suspend fun getCachedHashes(imageIds: List<Long>): Map<Long, CachedImageHashes>
 
-    suspend fun saveHash(imageId: Long, md5Hash: String, perceptualHash: String?)
+    suspend fun saveHash(image: ImageItem, md5Hash: String, perceptualHash: String?)
 
     suspend fun findExactDuplicates(images: List<ImageItem>): List<DuplicateGroup>
 

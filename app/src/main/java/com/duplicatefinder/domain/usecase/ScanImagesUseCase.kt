@@ -18,22 +18,29 @@ class ScanImagesUseCase @Inject constructor(
 
         val images = imageRepository.getAllImages()
         val total = images.size
+        val cachedHashes = imageRepository.getCachedHashes(images.map { it.id })
 
         emit(ScanProgress(ScanPhase.HASHING, 0, total) to emptyList())
 
         val hashedImages = mutableListOf<ImageItem>()
 
         images.forEachIndexed { index, image ->
-            val cachedHash = imageRepository.getCachedHash(image.id)
+            val cachedHash = cachedHashes[image.id]
 
-            val hashedImage = if (cachedHash != null) {
-                image.copy(md5Hash = cachedHash)
+            val hashedImage = if (cachedHash != null &&
+                cachedHash.dateModified == image.dateModified &&
+                cachedHash.size == image.size
+            ) {
+                image.copy(
+                    md5Hash = cachedHash.md5Hash,
+                    perceptualHash = cachedHash.perceptualHash
+                )
             } else {
                 val md5 = imageRepository.calculateMd5Hash(image)
                 val pHash = imageRepository.calculatePerceptualHash(image)
 
                 if (md5 != null) {
-                    imageRepository.saveHash(image.id, md5, pHash)
+                    imageRepository.saveHash(image, md5, pHash)
                 }
 
                 image.copy(md5Hash = md5, perceptualHash = pHash)
@@ -41,16 +48,22 @@ class ScanImagesUseCase @Inject constructor(
 
             hashedImages.add(hashedImage)
 
-            emit(
-                ScanProgress(
-                    phase = ScanPhase.HASHING,
-                    current = index + 1,
-                    total = total,
-                    currentFile = image.name
-                ) to hashedImages.toList()
-            )
+            if (index % PROGRESS_STEP == 0 || index == total - 1) {
+                emit(
+                    ScanProgress(
+                        phase = ScanPhase.HASHING,
+                        current = index + 1,
+                        total = total,
+                        currentFile = image.name
+                    ) to emptyList()
+                )
+            }
         }
 
         emit(ScanProgress(ScanPhase.COMPLETE, total, total) to hashedImages)
     }.flowOn(Dispatchers.Default)
+
+    companion object {
+        private const val PROGRESS_STEP = 20
+    }
 }

@@ -140,6 +140,7 @@ class PerceptualHashCalculator @Inject constructor(
     companion object {
         private const val HASH_SIZE = 32
         private const val LOW_FREQ_SIZE = 8
+        const val HASH_BITS = LOW_FREQ_SIZE * LOW_FREQ_SIZE - 1
         private val PI_OVER_2N = Math.PI / (2 * HASH_SIZE)
 
         fun hammingDistance(hash1: String, hash2: String): Int {
@@ -148,12 +149,37 @@ class PerceptualHashCalculator @Inject constructor(
             return hash1.zip(hash2).count { (a, b) -> a != b }
         }
 
+        fun hammingDistance(hash1: Long, hash2: Long): Int {
+            return java.lang.Long.bitCount(hash1 xor hash2)
+        }
+
         fun similarity(hash1: String, hash2: String): Float {
             if (hash1.isEmpty() || hash2.isEmpty()) return 0f
             if (hash1.length != hash2.length) return 0f
 
             val distance = hammingDistance(hash1, hash2)
             return 1f - (distance.toFloat() / hash1.length)
+        }
+
+        fun similarity(hash1: Long, hash2: Long, bitCount: Int): Float {
+            if (bitCount <= 0) return 0f
+            val distance = hammingDistance(hash1, hash2)
+            return 1f - (distance.toFloat() / bitCount)
+        }
+
+        fun toLong(hash: String): Long? {
+            if (hash.isEmpty() || hash.length > 63) return null
+
+            var value = 0L
+            for (ch in hash) {
+                value = value shl 1
+                when (ch) {
+                    '1' -> value = value or 1L
+                    '0' -> Unit
+                    else -> return null
+                }
+            }
+            return value
         }
     }
 }

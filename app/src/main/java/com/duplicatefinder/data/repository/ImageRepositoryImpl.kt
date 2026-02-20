@@ -4,10 +4,10 @@ import android.app.RecoverableSecurityException
 import android.content.ContentResolver
 import android.content.Context
 import android.os.Build
-import android.provider.MediaStore
 import com.duplicatefinder.data.local.db.dao.ImageHashDao
 import com.duplicatefinder.data.local.db.entities.ImageHashEntity
 import com.duplicatefinder.data.media.MediaStoreDataSource
+import com.duplicatefinder.domain.model.CachedImageHashes
 import com.duplicatefinder.domain.model.DuplicateGroup
 import com.duplicatefinder.domain.model.FilterCriteria
 import com.duplicatefinder.domain.model.ImageItem
@@ -80,15 +80,30 @@ class ImageRepositoryImpl @Inject constructor(
         return perceptualHashCalculator.calculate(image.uri)
     }
 
-    override suspend fun getCachedHash(imageId: Long): String? {
-        return imageHashDao.getByImageId(imageId)?.md5Hash
+    override suspend fun getCachedHashes(
+        imageIds: List<Long>
+    ): Map<Long, CachedImageHashes> {
+        if (imageIds.isEmpty()) return emptyMap()
+
+        val result = mutableMapOf<Long, CachedImageHashes>()
+
+        imageIds.chunked(HASH_QUERY_BATCH_SIZE).forEach { batch ->
+            imageHashDao.getByImageIds(batch).forEach { entity ->
+                result[entity.imageId] = CachedImageHashes(
+                    md5Hash = entity.md5Hash,
+                    perceptualHash = entity.perceptualHash,
+                    dateModified = entity.dateModified,
+                    size = entity.size
+                )
+            }
+        }
+
+        return result
     }
 
-    override suspend fun saveHash(imageId: Long, md5Hash: String, perceptualHash: String?) {
-        val image = mediaStoreDataSource.getImageById(imageId) ?: return
-
+    override suspend fun saveHash(image: ImageItem, md5Hash: String, perceptualHash: String?) {
         val entity = ImageHashEntity(
-            imageId = imageId,
+            imageId = image.id,
             path = image.path,
             md5Hash = md5Hash,
             perceptualHash = perceptualHash,
@@ -137,42 +152,118 @@ class ImageRepositoryImpl @Inject constructor(
         images: List<ImageItem>,
         threshold: Float
     ): List<DuplicateGroup> = withContext(Dispatchers.Default) {
-        val imagesWithPHash = images.filter { it.perceptualHash != null }
-        val processed = mutableSetOf<Long>()
+        data class PHashEntry(
+            val image: ImageItem,
+            val hash: Long,
+            val hashBits: Int
+        )
+
+        val entries = images.mapNotNull { image ->
+            val hashString = image.perceptualHash ?: return@mapNotNull null
+            val hash = PerceptualHashCalculator.toLong(hashString) ?: return@mapNotNull null
+            PHashEntry(image = image, hash = hash, hashBits = hashString.length)
+        }
+
+        if (entries.size < 2) return@withContext emptyList()
+
+        val hashBits = entries.first().hashBits
+        val filtered = entries.filter { it.hashBits == hashBits }
+        if (filtered.size < 2) return@withContext emptyList()
+
+        val maxDistance = ((1f - threshold) * hashBits).toInt().coerceAtLeast(0)
+        val bandCount = (maxDistance + 1).coerceAtMost(hashBits)
+        val bandSize = (hashBits + bandCount - 1) / bandCount
+
+        val buckets = HashMap<Long, MutableList<Int>>(filtered.size * bandCount)
+
+        if (bandCount == 1) {
+            filtered.forEachIndexed { index, entry ->
+                buckets.getOrPut(entry.hash) { mutableListOf() }.add(index)
+            }
+        } else {
+            filtered.forEachIndexed { index, entry ->
+                for (band in 0 until bandCount) {
+                    val start = band * bandSize
+                    if (start >= hashBits) break
+                    val size = minOf(bandSize, hashBits - start)
+                    val mask = (1L shl size) - 1
+                    val bandValue = (entry.hash ushr start) and mask
+                    val key = (band.toLong() shl 32) or bandValue
+                    buckets.getOrPut(key) { mutableListOf() }.add(index)
+                }
+            }
+        }
+
+        val processed = BooleanArray(filtered.size)
+        val seen = IntArray(filtered.size)
+        var stamp = 1
         val duplicateGroups = mutableListOf<DuplicateGroup>()
 
-        for (i in imagesWithPHash.indices) {
-            val image1 = imagesWithPHash[i]
-            if (image1.id in processed) continue
+        fun considerCandidate(baseIndex: Int, candidateIndex: Int, baseHash: Long, similar: MutableList<Int>) {
+            if (candidateIndex <= baseIndex) return
+            if (processed[candidateIndex]) return
+            if (seen[candidateIndex] == stamp) return
+            seen[candidateIndex] = stamp
 
-            val similarImages = mutableListOf(image1)
+            val distance = PerceptualHashCalculator.hammingDistance(
+                baseHash,
+                filtered[candidateIndex].hash
+            )
+            if (distance <= maxDistance) {
+                similar.add(candidateIndex)
+            }
+        }
 
-            for (j in (i + 1) until imagesWithPHash.size) {
-                val image2 = imagesWithPHash[j]
-                if (image2.id in processed) continue
+        for (i in filtered.indices) {
+            if (processed[i]) continue
 
-                val similarity = PerceptualHashCalculator.similarity(
-                    image1.perceptualHash!!,
-                    image2.perceptualHash!!
-                )
+            val baseHash = filtered[i].hash
+            stamp++
+            if (stamp == Int.MAX_VALUE) {
+                seen.fill(0)
+                stamp = 1
+            }
 
-                if (similarity >= threshold) {
-                    similarImages.add(image2)
+            val similarIndices = mutableListOf(i)
+
+            if (bandCount == 1) {
+                val candidates = buckets[baseHash] ?: emptyList()
+                for (j in candidates) {
+                    considerCandidate(i, j, baseHash, similarIndices)
+                }
+            } else {
+                for (band in 0 until bandCount) {
+                    val start = band * bandSize
+                    if (start >= hashBits) break
+                    val size = minOf(bandSize, hashBits - start)
+                    val mask = (1L shl size) - 1
+                    val bandValue = (baseHash ushr start) and mask
+                    val key = (band.toLong() shl 32) or bandValue
+                    val candidates = buckets[key] ?: continue
+                    for (j in candidates) {
+                        considerCandidate(i, j, baseHash, similarIndices)
+                    }
                 }
             }
 
-            if (similarImages.size >= 2) {
-                similarImages.forEach { processed.add(it.id) }
+            if (similarIndices.size >= 2) {
+                similarIndices.forEach { processed[it] = true }
 
-                val sortedImages = similarImages.sortedBy { it.dateModified }
-                val avgSimilarity = if (similarImages.size > 1) {
+                val sortedImages = similarIndices
+                    .map { filtered[it].image }
+                    .sortedBy { it.dateModified }
+
+                val avgSimilarity = if (similarIndices.size > 1) {
                     var totalSim = 0f
                     var count = 0
-                    for (x in similarImages.indices) {
-                        for (y in (x + 1) until similarImages.size) {
+                    for (x in similarIndices.indices) {
+                        val hashX = filtered[similarIndices[x]].hash
+                        for (y in (x + 1) until similarIndices.size) {
+                            val hashY = filtered[similarIndices[y]].hash
                             totalSim += PerceptualHashCalculator.similarity(
-                                similarImages[x].perceptualHash!!,
-                                similarImages[y].perceptualHash!!
+                                hashX,
+                                hashY,
+                                hashBits
                             )
                             count++
                         }
@@ -265,3 +356,5 @@ class ImageRepositoryImpl @Inject constructor(
         return mediaStoreDataSource.getImageCount()
     }
 }
+
+private const val HASH_QUERY_BATCH_SIZE = 900

@@ -39,16 +39,24 @@ class DuplicatesViewModel @Inject constructor(
 
             try {
                 val images = imageRepository.getAllImages()
+                val cachedHashes = imageRepository.getCachedHashes(images.map { it.id })
 
                 val hashedImages = images.mapNotNull { image ->
-                    val cachedHash = imageRepository.getCachedHash(image.id)
-                    if (cachedHash != null) {
-                        image.copy(md5Hash = cachedHash)
+                    val cachedHash = cachedHashes[image.id]
+
+                    if (cachedHash != null &&
+                        cachedHash.dateModified == image.dateModified &&
+                        cachedHash.size == image.size
+                    ) {
+                        image.copy(
+                            md5Hash = cachedHash.md5Hash,
+                            perceptualHash = cachedHash.perceptualHash
+                        )
                     } else {
                         val md5 = imageRepository.calculateMd5Hash(image)
                         val pHash = imageRepository.calculatePerceptualHash(image)
                         if (md5 != null) {
-                            imageRepository.saveHash(image.id, md5, pHash)
+                            imageRepository.saveHash(image, md5, pHash)
                             image.copy(md5Hash = md5, perceptualHash = pHash)
                         } else null
                     }
