@@ -1,6 +1,7 @@
 package com.duplicatefinder.data.repository
 
 import com.duplicatefinder.data.local.datastore.SettingsDataStore
+import com.duplicatefinder.domain.model.ScanMode
 import com.duplicatefinder.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -26,6 +27,9 @@ class SettingsRepositoryImpl @Inject constructor(
     override val lastScanTimestamp: Flow<Long>
         get() = settingsDataStore.lastScanTimestamp
 
+    override val scanMode: Flow<ScanMode>
+        get() = settingsDataStore.scanMode
+
     override suspend fun setSimilarityThreshold(threshold: Float) {
         settingsDataStore.setSimilarityThreshold(threshold)
     }
@@ -44,5 +48,9 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setLastScanTimestamp(timestamp: Long) {
         settingsDataStore.setLastScanTimestamp(timestamp)
+    }
+
+    override suspend fun setScanMode(mode: ScanMode) {
+        settingsDataStore.setScanMode(mode)
     }
 }

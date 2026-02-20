@@ -2,6 +2,7 @@ package com.duplicatefinder.domain.usecase
 
 import com.duplicatefinder.domain.model.ImageHashUpdate
 import com.duplicatefinder.domain.model.ImageItem
+import com.duplicatefinder.domain.model.ScanMode
 import com.duplicatefinder.domain.model.ScanPhase
 import com.duplicatefinder.domain.model.ScanProgress
 import com.duplicatefinder.domain.repository.ImageRepository
@@ -18,13 +19,16 @@ import javax.inject.Inject
 class ScanImagesUseCase @Inject constructor(
     private val imageRepository: ImageRepository
 ) {
-    operator fun invoke(): Flow<Pair<ScanProgress, List<ImageItem>>> = channelFlow {
+    operator fun invoke(
+        scanMode: ScanMode
+    ): Flow<Pair<ScanProgress, List<ImageItem>>> = channelFlow {
         send(ScanProgress(ScanPhase.LOADING, 0, 0) to emptyList())
 
         val images = imageRepository.getAllImages()
         val total = images.size
         val cachedHashes = imageRepository.getCachedHashes(images.map { it.id })
         val sizeCounts = images.groupingBy { it.size }.eachCount()
+        val computeSimilar = scanMode == ScanMode.EXACT_AND_SIMILAR
 
         send(ScanProgress(ScanPhase.HASHING, 0, total) to emptyList())
 
@@ -58,15 +62,19 @@ class ScanImagesUseCase @Inject constructor(
                         null
                     }
 
-                    val pHash = if (cacheValid && cachedHash!!.perceptualHash != null) {
-                        cachedHash.perceptualHash
+                    val pHash = if (computeSimilar) {
+                        if (cacheValid && cachedHash!!.perceptualHash != null) {
+                            cachedHash.perceptualHash
+                        } else {
+                            imageRepository.calculatePerceptualHash(image)
+                        }
                     } else {
-                        imageRepository.calculatePerceptualHash(image)
+                        null
                     }
 
                     if (md5 != null) {
                         val shouldSave = !cacheValid ||
-                            (cachedHash!!.perceptualHash == null && pHash != null)
+                            (computeSimilar && cachedHash!!.perceptualHash == null && pHash != null)
 
                         if (shouldSave) {
                             hashUpdates[index] = ImageHashUpdate(
@@ -106,9 +114,12 @@ class ScanImagesUseCase @Inject constructor(
             imageRepository.saveHashes(updatesToSave)
         }
 
+        val finalImages = hashedImages.filterNotNull().let { items ->
+            if (computeSimilar) items else items.filter { it.md5Hash != null }
+        }
+
         send(
-            ScanProgress(ScanPhase.COMPLETE, total, total) to
-                hashedImages.filterNotNull()
+            ScanProgress(ScanPhase.COMPLETE, total, total) to finalImages
         )
     }.flowOn(Dispatchers.Default)
 

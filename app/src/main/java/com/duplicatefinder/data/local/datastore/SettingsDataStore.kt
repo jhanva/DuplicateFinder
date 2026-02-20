@@ -8,8 +8,10 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.duplicatefinder.domain.model.ScanMode
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -28,6 +30,7 @@ class SettingsDataStore @Inject constructor(
         val IS_DARK_MODE = booleanPreferencesKey("is_dark_mode")
         val EXCLUDED_FOLDERS = stringSetPreferencesKey("excluded_folders")
         val LAST_SCAN_TIMESTAMP = longPreferencesKey("last_scan_timestamp")
+        val SCAN_MODE = stringPreferencesKey("scan_mode")
     }
 
     val similarityThreshold: Flow<Float> = context.dataStore.data.map { preferences ->
@@ -48,6 +51,14 @@ class SettingsDataStore @Inject constructor(
 
     val lastScanTimestamp: Flow<Long> = context.dataStore.data.map { preferences ->
         preferences[Keys.LAST_SCAN_TIMESTAMP] ?: 0L
+    }
+
+    val scanMode: Flow<ScanMode> = context.dataStore.data.map { preferences ->
+        when (preferences[Keys.SCAN_MODE]) {
+            ScanMode.EXACT.name -> ScanMode.EXACT
+            ScanMode.EXACT_AND_SIMILAR.name -> ScanMode.EXACT_AND_SIMILAR
+            else -> DEFAULT_SCAN_MODE
+        }
     }
 
     suspend fun setSimilarityThreshold(threshold: Float) {
@@ -80,8 +91,15 @@ class SettingsDataStore @Inject constructor(
         }
     }
 
+    suspend fun setScanMode(mode: ScanMode) {
+        context.dataStore.edit { preferences ->
+            preferences[Keys.SCAN_MODE] = mode.name
+        }
+    }
+
     companion object {
         const val DEFAULT_SIMILARITY_THRESHOLD = 0.9f
         const val DEFAULT_AUTO_DELETE_DAYS = 30
+        val DEFAULT_SCAN_MODE = ScanMode.EXACT_AND_SIMILAR
     }
 }

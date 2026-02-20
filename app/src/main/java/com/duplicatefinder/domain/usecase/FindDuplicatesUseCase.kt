@@ -3,6 +3,7 @@ package com.duplicatefinder.domain.usecase
 import com.duplicatefinder.domain.model.DuplicateGroup
 import com.duplicatefinder.domain.model.ImageItem
 import com.duplicatefinder.domain.model.MatchType
+import com.duplicatefinder.domain.model.ScanMode
 import com.duplicatefinder.domain.repository.ImageRepository
 import com.duplicatefinder.domain.repository.SettingsRepository
 import kotlinx.coroutines.Dispatchers
@@ -14,11 +15,17 @@ class FindDuplicatesUseCase @Inject constructor(
     private val imageRepository: ImageRepository,
     private val settingsRepository: SettingsRepository
 ) {
-    suspend operator fun invoke(images: List<ImageItem>): List<DuplicateGroup> =
+    suspend operator fun invoke(
+        images: List<ImageItem>,
+        scanMode: ScanMode
+    ): List<DuplicateGroup> =
         withContext(Dispatchers.Default) {
-            val threshold = settingsRepository.similarityThreshold.first()
-
             val exactDuplicates = imageRepository.findExactDuplicates(images)
+            if (scanMode == ScanMode.EXACT) {
+                return@withContext exactDuplicates.sortedByDescending { it.potentialSavings }
+            }
+
+            val threshold = settingsRepository.similarityThreshold.first()
             val similarImages = imageRepository.findSimilarImages(images, threshold)
 
             mergeDuplicateGroups(exactDuplicates, similarImages)

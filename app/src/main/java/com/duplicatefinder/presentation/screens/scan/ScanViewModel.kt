@@ -12,6 +12,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -40,7 +41,8 @@ class ScanViewModel @Inject constructor(
                     )
                 }
 
-                scanImagesUseCase().collect { (progress, images) ->
+                val scanMode = settingsRepository.scanMode.first()
+                scanImagesUseCase(scanMode).collect { (progress, images) ->
                     _uiState.update { it.copy(scanProgress = progress) }
 
                     if (progress.phase == ScanPhase.COMPLETE && images.isNotEmpty()) {
@@ -50,7 +52,7 @@ class ScanViewModel @Inject constructor(
                             )
                         }
 
-                        val duplicateGroups = findDuplicatesUseCase(images)
+                        val duplicateGroups = findDuplicatesUseCase(images, scanMode)
 
                         val totalDuplicates = duplicateGroups.sumOf { it.imageCount - 1 }
                         val potentialSavings = duplicateGroups.sumOf { it.potentialSavings }

@@ -57,6 +57,8 @@
     <string name="settings_scan_options">Scan Options</string>
     <string name="settings_similarity_threshold">Similarity Threshold</string>
     <string name="settings_similarity_description">Images with similarity above this will be marked as duplicates</string>
+    <string name="settings_find_similar">Find similar images</string>
+    <string name="settings_find_similar_description">Disable for the fastest scan (exact duplicates only)</string>
     <string name="settings_include_folders">Include Folders</string>
     <string name="settings_exclude_folders">Exclude Folders</string>
     <string name="settings_trash_options">Trash Options</string>

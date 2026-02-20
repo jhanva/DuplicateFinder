@@ -2,6 +2,7 @@ package com.duplicatefinder.presentation.screens.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.duplicatefinder.domain.model.ScanMode
 import com.duplicatefinder.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -43,6 +44,13 @@ class SettingsViewModel @Inject constructor(
             initialValue = emptySet()
         )
 
+    val scanMode: StateFlow<ScanMode> = settingsRepository.scanMode
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = ScanMode.EXACT_AND_SIMILAR
+        )
+
     fun setSimilarityThreshold(threshold: Float) {
         viewModelScope.launch {
             settingsRepository.setSimilarityThreshold(threshold)
@@ -72,6 +80,12 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val current = excludedFolders.value
             settingsRepository.setExcludedFolders(current - folder)
+        }
+    }
+
+    fun setScanMode(mode: ScanMode) {
+        viewModelScope.launch {
+            settingsRepository.setScanMode(mode)
         }
     }
 }

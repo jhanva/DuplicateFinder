@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.duplicatefinder.BuildConfig
 import com.duplicatefinder.R
+import com.duplicatefinder.domain.model.ScanMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,6 +44,7 @@ fun SettingsScreen(
     val similarityThreshold by viewModel.similarityThreshold.collectAsState()
     val autoDeleteDays by viewModel.autoDeleteDays.collectAsState()
     val isDarkMode by viewModel.isDarkMode.collectAsState()
+    val scanMode by viewModel.scanMode.collectAsState()
 
     var localThreshold by remember(similarityThreshold) {
         mutableFloatStateOf(similarityThreshold)
@@ -65,12 +67,29 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             SettingsSection(title = stringResource(R.string.settings_scan_options)) {
+                SettingsSwitchItem(
+                    title = stringResource(R.string.settings_find_similar),
+                    description = stringResource(R.string.settings_find_similar_description),
+                    checked = scanMode == ScanMode.EXACT_AND_SIMILAR,
+                    onCheckedChange = { enabled ->
+                        val mode = if (enabled) {
+                            ScanMode.EXACT_AND_SIMILAR
+                        } else {
+                            ScanMode.EXACT
+                        }
+                        viewModel.setScanMode(mode)
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 SettingsSliderItem(
                     title = stringResource(R.string.settings_similarity_threshold),
                     description = stringResource(R.string.settings_similarity_description),
                     value = localThreshold,
                     valueRange = 0.5f..1f,
                     valueDisplay = "${(localThreshold * 100).toInt()}%",
+                    enabled = scanMode == ScanMode.EXACT_AND_SIMILAR,
                     onValueChange = { localThreshold = it },
                     onValueChangeFinished = { viewModel.setSimilarityThreshold(localThreshold) }
                 )
@@ -154,6 +173,7 @@ private fun SettingsSliderItem(
     value: Float,
     valueRange: ClosedFloatingPointRange<Float>,
     valueDisplay: String,
+    enabled: Boolean = true,
     steps: Int = 0,
     onValueChange: (Float) -> Unit,
     onValueChangeFinished: () -> Unit
@@ -193,7 +213,8 @@ private fun SettingsSliderItem(
             onValueChange = onValueChange,
             valueRange = valueRange,
             steps = steps,
-            onValueChangeFinished = onValueChangeFinished
+            onValueChangeFinished = onValueChangeFinished,
+            enabled = enabled
         )
     }
 }
