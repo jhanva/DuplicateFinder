@@ -54,29 +54,32 @@ class TrashRepositoryImpl @Inject constructor(
                     try {
                         val trashFile = File(trashDir, "${image.id}_${image.name}")
 
-                        context.contentResolver.openInputStream(image.uri)?.use { input ->
+                        val inputStream = context.contentResolver.openInputStream(image.uri) ?: return@forEach
+                        inputStream.use { input ->
                             FileOutputStream(trashFile).use { output ->
                                 input.copyTo(output)
                             }
                         }
 
                         if (trashFile.exists()) {
-                            val entity = TrashEntity(
-                                originalUri = image.uri.toString(),
-                                originalPath = image.path,
-                                trashPath = trashFile.absolutePath,
-                                name = image.name,
-                                size = image.size,
-                                mimeType = image.mimeType,
-                                deletedAt = now,
-                                expiresAt = expiresAt
-                            )
+                            val deleteResult = context.contentResolver.delete(image.uri, null, null)
+                            if (deleteResult > 0) {
+                                val entity = TrashEntity(
+                                    originalUri = image.uri.toString(),
+                                    originalPath = image.path,
+                                    trashPath = trashFile.absolutePath,
+                                    name = image.name,
+                                    size = image.size,
+                                    mimeType = image.mimeType,
+                                    deletedAt = now,
+                                    expiresAt = expiresAt
+                                )
 
-                            trashDao.insert(entity)
-
-                            context.contentResolver.delete(image.uri, null, null)
-
-                            movedCount++
+                                trashDao.insert(entity)
+                                movedCount++
+                            } else {
+                                trashFile.delete()
+                            }
                         }
                     } catch (e: Exception) {
                         // Continue with next image

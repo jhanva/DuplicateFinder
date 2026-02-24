@@ -210,29 +210,40 @@ class DuplicatesViewModel @Inject constructor(
                 val result = moveToTrashUseCase(imagesToDelete)
 
                 result.onSuccess { deletedCount ->
-                    _uiState.update { state ->
-                        val updatedGroups = state.duplicateGroups.mapNotNull { group ->
-                            val remainingImages = group.images.filterNot { it.id in selectedIds }
-                            if (remainingImages.size >= 2) {
-                                group.copy(
-                                    images = remainingImages,
-                                    totalSize = remainingImages.sumOf { it.size },
-                                    potentialSavings = remainingImages.drop(1).sumOf { it.size }
-                                )
-                            } else null
+                    if (deletedCount == imagesToDelete.size) {
+                        _uiState.update { state ->
+                            val updatedGroups = state.duplicateGroups.mapNotNull { group ->
+                                val remainingImages = group.images.filterNot { it.id in selectedIds }
+                                if (remainingImages.size >= 2) {
+                                    group.copy(
+                                        images = remainingImages,
+                                        totalSize = remainingImages.sumOf { it.size },
+                                        potentialSavings = remainingImages.drop(1).sumOf { it.size }
+                                    )
+                                } else null
+                            }
+
+                            val filteredUpdated = filterImagesUseCase.invoke(
+                                updatedGroups,
+                                state.filterCriteria
+                            )
+
+                            state.copy(
+                                isDeleting = false,
+                                selectedImages = emptySet(),
+                                duplicateGroups = updatedGroups,
+                                filteredGroups = filteredUpdated
+                            )
                         }
-
-                        val filteredUpdated = filterImagesUseCase.invoke(
-                            updatedGroups,
-                            state.filterCriteria
-                        )
-
-                        state.copy(
-                            isDeleting = false,
-                            selectedImages = emptySet(),
-                            duplicateGroups = updatedGroups,
-                            filteredGroups = updatedGroups
-                        )
+                    } else {
+                        _uiState.update {
+                            it.copy(
+                                error = "Only $deletedCount of ${imagesToDelete.size} images were moved to trash.",
+                                isDeleting = false,
+                                selectedImages = emptySet()
+                            )
+                        }
+                        loadDuplicates()
                     }
                 }
 
