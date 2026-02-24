@@ -55,8 +55,8 @@ class ScanImagesUseCase @Inject constructor(
 
                     val shouldComputeMd5 = (sizeCounts[image.size] ?: 0) > 1
 
-                    val md5 = if (cacheValid) {
-                        cachedHash!!.md5Hash
+                    val md5 = if (cacheValid && cachedHash!!.md5Hash != null) {
+                        cachedHash.md5Hash
                     } else if (shouldComputeMd5) {
                         imageRepository.calculateMd5Hash(image)
                     } else {
@@ -73,9 +73,10 @@ class ScanImagesUseCase @Inject constructor(
                         null
                     }
 
-                    if (md5 != null) {
+                    if (md5 != null || pHash != null) {
                         val shouldSave = !cacheValid ||
-                            (computeSimilar && cachedHash!!.perceptualHash == null && pHash != null)
+                            (computeSimilar && cachedHash!!.perceptualHash == null && pHash != null) ||
+                            (shouldComputeMd5 && cachedHash!!.md5Hash == null && md5 != null)
 
                         if (shouldSave) {
                             hashUpdates[index] = ImageHashUpdate(

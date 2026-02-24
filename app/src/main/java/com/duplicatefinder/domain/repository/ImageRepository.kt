@@ -23,7 +23,7 @@ interface ImageRepository {
 
     suspend fun getCachedHashes(imageIds: List<Long>): Map<Long, CachedImageHashes>
 
-    suspend fun saveHash(image: ImageItem, md5Hash: String, perceptualHash: String?)
+    suspend fun saveHash(image: ImageItem, md5Hash: String?, perceptualHash: String?)
     suspend fun saveHashes(updates: List<ImageHashUpdate>)
 
     suspend fun findExactDuplicates(images: List<ImageItem>): List<DuplicateGroup>

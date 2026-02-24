@@ -47,7 +47,7 @@ open class BaseImageRepositoryFake : ImageRepository {
 
     override suspend fun getCachedHashes(imageIds: List<Long>): Map<Long, CachedImageHashes> = emptyMap()
 
-    override suspend fun saveHash(image: ImageItem, md5Hash: String, perceptualHash: String?) = Unit
+    override suspend fun saveHash(image: ImageItem, md5Hash: String?, perceptualHash: String?) = Unit
 
     override suspend fun saveHashes(updates: List<ImageHashUpdate>) = Unit
 

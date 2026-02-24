@@ -91,7 +91,7 @@ class ImageRepositoryImpl @Inject constructor(
         imageIds.chunked(HASH_QUERY_BATCH_SIZE).forEach { batch ->
             imageHashDao.getByImageIds(batch).forEach { entity ->
                 result[entity.imageId] = CachedImageHashes(
-                    md5Hash = entity.md5Hash,
+                    md5Hash = entity.md5Hash.ifBlank { null },
                     perceptualHash = entity.perceptualHash,
                     dateModified = entity.dateModified,
                     size = entity.size
@@ -102,11 +102,11 @@ class ImageRepositoryImpl @Inject constructor(
         return result
     }
 
-    override suspend fun saveHash(image: ImageItem, md5Hash: String, perceptualHash: String?) {
+    override suspend fun saveHash(image: ImageItem, md5Hash: String?, perceptualHash: String?) {
         val entity = ImageHashEntity(
             imageId = image.id,
             path = image.path,
-            md5Hash = md5Hash,
+            md5Hash = md5Hash ?: "",
             perceptualHash = perceptualHash,
             dateModified = image.dateModified,
             size = image.size
@@ -122,7 +122,7 @@ class ImageRepositoryImpl @Inject constructor(
             ImageHashEntity(
                 imageId = update.image.id,
                 path = update.image.path,
-                md5Hash = update.md5Hash,
+                md5Hash = update.md5Hash ?: "",
                 perceptualHash = update.perceptualHash,
                 dateModified = update.image.dateModified,
                 size = update.image.size

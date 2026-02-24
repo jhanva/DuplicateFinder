@@ -3,6 +3,7 @@ package com.duplicatefinder.presentation.screens.duplicates
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.duplicatefinder.domain.model.FilterCriteria
+import com.duplicatefinder.domain.model.ImageHashUpdate
 import com.duplicatefinder.domain.model.ScanMode
 import com.duplicatefinder.domain.repository.ImageRepository
 import com.duplicatefinder.domain.repository.SettingsRepository
@@ -61,6 +62,7 @@ class DuplicatesViewModel @Inject constructor(
                 val scanMode = settingsRepository.scanMode.first()
                 val computeSimilar = scanMode == ScanMode.EXACT_AND_SIMILAR
                 val sizeCounts = images.groupingBy { it.size }.eachCount()
+                val hashUpdates = mutableListOf<ImageHashUpdate>()
 
                 val hashedImages = images.mapNotNull { image ->
                     val cachedHash = cachedHashes[image.id]
@@ -70,8 +72,8 @@ class DuplicatesViewModel @Inject constructor(
 
                     val shouldComputeMd5 = (sizeCounts[image.size] ?: 0) > 1
 
-                    val md5 = if (cacheValid) {
-                        cachedHash!!.md5Hash
+                    val md5 = if (cacheValid && cachedHash!!.md5Hash != null) {
+                        cachedHash.md5Hash
                     } else if (shouldComputeMd5) {
                         imageRepository.calculateMd5Hash(image)
                     } else {
@@ -88,16 +90,27 @@ class DuplicatesViewModel @Inject constructor(
                         null
                     }
 
-                    if (md5 != null) {
+                    if (md5 != null || pHash != null) {
                         val shouldSave = !cacheValid ||
-                            (computeSimilar && cachedHash!!.perceptualHash == null && pHash != null)
+                            (computeSimilar && cachedHash!!.perceptualHash == null && pHash != null) ||
+                            (shouldComputeMd5 && cachedHash!!.md5Hash == null && md5 != null)
                         if (shouldSave) {
-                            imageRepository.saveHash(image, md5, pHash)
+                            hashUpdates.add(
+                                ImageHashUpdate(
+                                    image = image,
+                                    md5Hash = md5,
+                                    perceptualHash = pHash
+                                )
+                            )
                         }
                     }
 
                     val result = image.copy(md5Hash = md5, perceptualHash = pHash)
                     if (md5 != null || (computeSimilar && pHash != null)) result else null
+                }
+
+                if (hashUpdates.isNotEmpty()) {
+                    imageRepository.saveHashes(hashUpdates)
                 }
 
                 val duplicates = findDuplicatesUseCase(hashedImages, scanMode)
