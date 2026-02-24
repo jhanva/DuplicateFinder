@@ -11,6 +11,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.util.Collections
 
 class ScanImagesUseCaseTest {
 
@@ -37,7 +38,7 @@ class ScanImagesUseCaseTest {
         val image3 = testImage(id = 3, size = 50)
 
         val repo = object : BaseImageRepositoryFake() {
-            val md5Requests = mutableListOf<Long>()
+            val md5Requests = Collections.synchronizedList(mutableListOf<Long>())
             var savedUpdates: List<ImageHashUpdate> = emptyList()
 
             override suspend fun getAllImages(): List<ImageItem> = listOf(image1, image2, image3)

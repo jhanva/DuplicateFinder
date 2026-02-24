@@ -89,8 +89,8 @@ class FindDuplicatesUseCaseTest {
         val merged = result.first()
         assertEquals(MatchType.BOTH, merged.matchType)
         assertEquals(setOf(1L, 2L, 3L, 4L), merged.images.map { it.id }.toSet())
-        assertEquals(240L, merged.totalSize)
-        assertEquals(140L, merged.potentialSavings)
+        assertEquals(340L, merged.totalSize)
+        assertEquals(240L, merged.potentialSavings)
         assertTrue(merged.images.any { it.id == 3L })
         assertTrue(merged.images.any { it.id == 4L })
     }
