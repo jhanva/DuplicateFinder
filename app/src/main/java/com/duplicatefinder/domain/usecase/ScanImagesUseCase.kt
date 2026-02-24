@@ -22,16 +22,16 @@ class ScanImagesUseCase @Inject constructor(
     operator fun invoke(
         scanMode: ScanMode,
         folders: Set<String> = emptySet()
-    ): Flow<Pair<ScanProgress, List<ImageItem>>> = channelFlow {
-        send(ScanProgress(ScanPhase.LOADING, 0, 0) to emptyList())
+    ): Flow<Pair<ScanProgress, List<ImageItem>>> = channelFlow<Pair<ScanProgress, List<ImageItem>>> {
+        send(ScanProgress(ScanPhase.LOADING, 0, 0) to emptyList<ImageItem>())
 
         val total = imageRepository.getImageCount(folders)
         val computeSimilar = scanMode == ScanMode.EXACT_AND_SIMILAR
 
-        send(ScanProgress(ScanPhase.HASHING, 0, total) to emptyList())
+        send(ScanProgress(ScanPhase.HASHING, 0, total) to emptyList<ImageItem>())
 
         if (total == 0) {
-            send(ScanProgress(ScanPhase.COMPLETE, 0, 0) to emptyList())
+            send(ScanProgress(ScanPhase.COMPLETE, 0, 0) to emptyList<ImageItem>())
             return@channelFlow
         }
 
@@ -124,7 +124,7 @@ class ScanImagesUseCase @Inject constructor(
                                     current = done,
                                     total = total,
                                     currentFile = image.name
-                                ) to emptyList()
+                                ) to emptyList<ImageItem>()
                             )
                         }
                     }
@@ -148,7 +148,7 @@ class ScanImagesUseCase @Inject constructor(
         }
 
         send(
-            ScanProgress(ScanPhase.COMPLETE, total, total) to finalImages
+            ScanProgress(ScanPhase.COMPLETE, total, total) to finalImages.toList()
         )
     }.flowOn(Dispatchers.Default)
 
