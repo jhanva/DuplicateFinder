@@ -28,6 +28,7 @@ class MediaStoreDataSource @Inject constructor(
     private val projection = arrayOf(
         MediaStore.Images.Media._ID,
         MediaStore.Images.Media.DISPLAY_NAME,
+        MediaStore.Images.Media.RELATIVE_PATH,
         MediaStore.Images.Media.DATA,
         MediaStore.Images.Media.SIZE,
         MediaStore.Images.Media.DATE_MODIFIED,
@@ -52,7 +53,8 @@ class MediaStoreDataSource @Inject constructor(
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-            val pathColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
+            val relativePathColumn = cursor.getColumnIndex(MediaStore.Images.Media.RELATIVE_PATH)
+            val dataPathColumn = cursor.getColumnIndex(MediaStore.Images.Media.DATA)
             val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
             val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_MODIFIED)
             val mimeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.MIME_TYPE)
@@ -63,16 +65,22 @@ class MediaStoreDataSource @Inject constructor(
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
                 val name = cursor.getString(nameColumn) ?: "Unknown"
-                val path = cursor.getString(pathColumn) ?: ""
+                val relativePath = if (relativePathColumn >= 0) cursor.getString(relativePathColumn) else null
+                val absolutePath = if (dataPathColumn >= 0) cursor.getString(dataPathColumn) else null
                 val size = cursor.getLong(sizeColumn)
                 val dateModified = cursor.getLong(dateColumn)
                 val mimeType = cursor.getString(mimeColumn) ?: "image/*"
                 val width = cursor.getInt(widthColumn)
                 val height = cursor.getInt(heightColumn)
                 val folderName = cursor.getString(folderColumn) ?: ""
+                val path = when {
+                    !absolutePath.isNullOrBlank() -> absolutePath
+                    !relativePath.isNullOrBlank() -> "$relativePath$name"
+                    else -> folderName
+                }
 
                 val uri = ContentUris.withAppendedId(
-                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                    collection,
                     id
                 )
 
@@ -98,7 +106,7 @@ class MediaStoreDataSource @Inject constructor(
 
     suspend fun getImageById(id: Long): ImageItem? = withContext(Dispatchers.IO) {
         val uri = ContentUris.withAppendedId(
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            collection,
             id
         )
 
@@ -111,25 +119,35 @@ class MediaStoreDataSource @Inject constructor(
         )?.use { cursor ->
             if (cursor.moveToFirst()) {
                 val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-                val pathColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
+                val relativePathColumn = cursor.getColumnIndex(MediaStore.Images.Media.RELATIVE_PATH)
+                val dataPathColumn = cursor.getColumnIndex(MediaStore.Images.Media.DATA)
                 val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
                 val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_MODIFIED)
                 val mimeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.MIME_TYPE)
                 val widthColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.WIDTH)
                 val heightColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.HEIGHT)
                 val folderColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+                val name = cursor.getString(nameColumn) ?: "Unknown"
+                val relativePath = if (relativePathColumn >= 0) cursor.getString(relativePathColumn) else null
+                val absolutePath = if (dataPathColumn >= 0) cursor.getString(dataPathColumn) else null
+                val folderName = cursor.getString(folderColumn) ?: ""
+                val path = when {
+                    !absolutePath.isNullOrBlank() -> absolutePath
+                    !relativePath.isNullOrBlank() -> "$relativePath$name"
+                    else -> folderName
+                }
 
                 ImageItem(
                     id = id,
                     uri = uri,
-                    path = cursor.getString(pathColumn) ?: "",
-                    name = cursor.getString(nameColumn) ?: "Unknown",
+                    path = path,
+                    name = name,
                     size = cursor.getLong(sizeColumn),
                     dateModified = cursor.getLong(dateColumn),
                     mimeType = cursor.getString(mimeColumn) ?: "image/*",
                     width = cursor.getInt(widthColumn),
                     height = cursor.getInt(heightColumn),
-                    folderName = cursor.getString(folderColumn) ?: ""
+                    folderName = folderName
                 )
             } else null
         }
