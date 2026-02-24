@@ -105,9 +105,21 @@ app/src/main/java/com/duplicatefinder/
 
 ## Requirements
 
+### App Requirements
+
 - **Min SDK**: 26 (Android 8.0)
 - **Target SDK**: 34 (Android 14)
-- **Recommended**: Samsung S23 Ultra or similar high-end device
+- **Recommended Device**: High-end Android device for large gallery scans
+
+### Development Requirements
+
+- **JDK**: 17
+- **Gradle Wrapper**: Included (`gradlew`, `gradlew.bat`)
+- **Android SDK packages**:
+  - `platform-tools`
+  - `platforms;android-34`
+  - `build-tools;34.0.0`
+- **Optional**: Android Studio (recommended for emulator + debugging)
 
 ## Permissions
 
@@ -119,33 +131,110 @@ app/src/main/java/com/duplicatefinder/
 
 **Note**: No INTERNET permission - the app is 100% offline.
 
-## Build
+## Setup
 
-### Debug APK
+### 1) Clone
 
 ```bash
-# Clone repository
 git clone https://github.com/jhanva/DuplicateFinder.git
 cd DuplicateFinder
-
-# Build debug APK
-./gradlew assembleDebug
-
-# APK location
-# app/build/outputs/apk/debug/app-debug.apk
 ```
+
+### 2) Configure Android SDK Path
+
+Create a `local.properties` file in project root:
+
+```properties
+sdk.dir=C:\\Users\\YOUR_USER\\AppData\\Local\\Android\\Sdk
+```
+
+If you use a custom/local SDK folder, point `sdk.dir` to that location.
+
+### 3) Verify Tooling
+
+Windows:
+
+```powershell
+.\gradlew.bat --version
+```
+
+macOS/Linux:
+
+```bash
+./gradlew --version
+```
+
+## Build
+
+### Build Debug APK
+
+Windows:
+
+```powershell
+.\gradlew.bat assembleDebug
+```
+
+macOS/Linux:
+
+```bash
+./gradlew assembleDebug
+```
+
+APK output:
+
+`app/build/outputs/apk/debug/app-debug.apk`
 
 ### Install on Device
 
 ```bash
-# Connect device with USB debugging enabled
-adb install app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-### Run Tests
+## Testing
+
+### Unit Tests (JVM)
+
+Windows:
+
+```powershell
+.\gradlew.bat testDebugUnitTest
+```
+
+macOS/Linux:
+
+```bash
+./gradlew testDebugUnitTest
+```
+
+HTML report:
+
+`app/build/reports/tests/testDebugUnitTest/index.html`
+
+### Full Unit Test Suite
+
+Windows:
+
+```powershell
+.\gradlew.bat test
+```
+
+macOS/Linux:
 
 ```bash
 ./gradlew test
+```
+
+### Instrumentation Tests (Device/Emulator Required)
+
+```bash
+adb devices
+./gradlew connectedDebugAndroidTest
+```
+
+Windows equivalent:
+
+```powershell
+.\gradlew.bat connectedDebugAndroidTest
 ```
 
 ## Configuration
@@ -160,11 +249,11 @@ Settings available in the app:
 
 ## Privacy & Security
 
-- ✅ **No Internet Access** - App cannot connect to any server
-- ✅ **No Analytics** - No tracking or telemetry
-- ✅ **No Ads** - No advertising SDKs
-- ✅ **Local Processing** - All hashing done on-device
-- ✅ **Open Source** - Full code transparency
+- **No Internet Access** - App cannot connect to any server
+- **No Analytics** - No tracking or telemetry
+- **No Ads** - No advertising SDKs
+- **Local Processing** - All hashing done on-device
+- **Open Source** - Full code transparency
 
 ## License
 

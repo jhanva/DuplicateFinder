@@ -88,7 +88,7 @@ class ScanImagesUseCase @Inject constructor(
                     hashedImages[index] = image.copy(
                         md5Hash = md5,
                         perceptualHash = pHash
-                    }
+                    )
 
                     val done = completed.incrementAndGet()
                     if (done % PROGRESS_STEP == 0 || done == total) {
