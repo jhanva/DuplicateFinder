@@ -10,6 +10,11 @@ import kotlinx.coroutines.flow.Flow
 
 interface ImageRepository {
     suspend fun getAllImages(folders: Set<String> = emptySet()): List<ImageItem>
+    suspend fun getImagesBatch(
+        folders: Set<String> = emptySet(),
+        limit: Int,
+        offset: Int
+    ): List<ImageItem>
 
     fun scanImagesWithProgress(): Flow<ScanProgress>
 

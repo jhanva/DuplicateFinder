@@ -43,6 +43,14 @@ class ImageRepositoryImpl @Inject constructor(
         return mediaStoreDataSource.getAllImages(folders)
     }
 
+    override suspend fun getImagesBatch(
+        folders: Set<String>,
+        limit: Int,
+        offset: Int
+    ): List<ImageItem> {
+        return mediaStoreDataSource.getImagesBatch(folders, limit, offset)
+    }
+
     override fun scanImagesWithProgress(): Flow<ScanProgress> = flow {
         emit(ScanProgress(ScanPhase.LOADING, 0, 0))
 

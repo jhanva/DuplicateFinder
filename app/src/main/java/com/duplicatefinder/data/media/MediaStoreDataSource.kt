@@ -6,6 +6,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.database.Cursor
 import com.duplicatefinder.domain.model.ImageItem
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -51,53 +52,34 @@ class MediaStoreDataSource @Inject constructor(
             selectionArgs,
             sortOrder
         )?.use { cursor ->
-            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-            val relativePathColumn = cursor.getColumnIndex(MediaStore.Images.Media.RELATIVE_PATH)
-            val dataPathColumn = cursor.getColumnIndex(MediaStore.Images.Media.DATA)
-            val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
-            val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_MODIFIED)
-            val mimeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.MIME_TYPE)
-            val widthColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.WIDTH)
-            val heightColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.HEIGHT)
-            val folderColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
-
             while (cursor.moveToNext()) {
-                val id = cursor.getLong(idColumn)
-                val name = cursor.getString(nameColumn) ?: "Unknown"
-                val relativePath = if (relativePathColumn >= 0) cursor.getString(relativePathColumn) else null
-                val absolutePath = if (dataPathColumn >= 0) cursor.getString(dataPathColumn) else null
-                val size = cursor.getLong(sizeColumn)
-                val dateModified = cursor.getLong(dateColumn)
-                val mimeType = cursor.getString(mimeColumn) ?: "image/*"
-                val width = cursor.getInt(widthColumn)
-                val height = cursor.getInt(heightColumn)
-                val folderName = cursor.getString(folderColumn) ?: ""
-                val path = when {
-                    !absolutePath.isNullOrBlank() -> absolutePath
-                    !relativePath.isNullOrBlank() -> "$relativePath$name"
-                    else -> folderName
-                }
+                images.add(cursor.toImageItem())
+            }
+        }
 
-                val uri = ContentUris.withAppendedId(
-                    collection,
-                    id
-                )
+        images
+    }
 
-                images.add(
-                    ImageItem(
-                        id = id,
-                        uri = uri,
-                        path = path,
-                        name = name,
-                        size = size,
-                        dateModified = dateModified,
-                        mimeType = mimeType,
-                        width = width,
-                        height = height,
-                        folderName = folderName
-                    )
-                )
+    suspend fun getImagesBatch(
+        folders: Set<String> = emptySet(),
+        limit: Int,
+        offset: Int
+    ): List<ImageItem> = withContext(Dispatchers.IO) {
+        if (limit <= 0 || offset < 0) return@withContext emptyList()
+
+        val images = mutableListOf<ImageItem>()
+        val (selection, selectionArgs) = buildFolderSelection(folders)
+        val sortOrder = "${MediaStore.Images.Media.DATE_MODIFIED} DESC LIMIT $limit OFFSET $offset"
+
+        contentResolver.query(
+            collection,
+            projection,
+            selection,
+            selectionArgs,
+            sortOrder
+        )?.use { cursor ->
+            while (cursor.moveToNext()) {
+                images.add(cursor.toImageItem())
             }
         }
 
@@ -189,5 +171,33 @@ class MediaStoreDataSource @Inject constructor(
         val placeholders = folders.joinToString(",") { "?" }
         val selection = "${MediaStore.Images.Media.BUCKET_DISPLAY_NAME} IN ($placeholders)"
         return selection to folders.toTypedArray()
+    }
+
+    private fun Cursor.toImageItem(): ImageItem {
+        val id = getLong(getColumnIndexOrThrow(MediaStore.Images.Media._ID))
+        val name = getString(getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)) ?: "Unknown"
+        val relativePathColumn = getColumnIndex(MediaStore.Images.Media.RELATIVE_PATH)
+        val dataPathColumn = getColumnIndex(MediaStore.Images.Media.DATA)
+        val relativePath = if (relativePathColumn >= 0) getString(relativePathColumn) else null
+        val absolutePath = if (dataPathColumn >= 0) getString(dataPathColumn) else null
+        val folderName = getString(getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)) ?: ""
+        val path = when {
+            !absolutePath.isNullOrBlank() -> absolutePath
+            !relativePath.isNullOrBlank() -> "$relativePath$name"
+            else -> folderName
+        }
+
+        return ImageItem(
+            id = id,
+            uri = ContentUris.withAppendedId(collection, id),
+            path = path,
+            name = name,
+            size = getLong(getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)),
+            dateModified = getLong(getColumnIndexOrThrow(MediaStore.Images.Media.DATE_MODIFIED)),
+            mimeType = getString(getColumnIndexOrThrow(MediaStore.Images.Media.MIME_TYPE)) ?: "image/*",
+            width = getInt(getColumnIndexOrThrow(MediaStore.Images.Media.WIDTH)),
+            height = getInt(getColumnIndexOrThrow(MediaStore.Images.Media.HEIGHT)),
+            folderName = folderName
+        )
     }
 }

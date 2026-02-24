@@ -34,6 +34,11 @@ fun testImage(
 
 open class BaseImageRepositoryFake : ImageRepository {
     override suspend fun getAllImages(folders: Set<String>): List<ImageItem> = emptyList()
+    override suspend fun getImagesBatch(
+        folders: Set<String>,
+        limit: Int,
+        offset: Int
+    ): List<ImageItem> = emptyList()
 
     override fun scanImagesWithProgress(): Flow<ScanProgress> = flowOf()
 
