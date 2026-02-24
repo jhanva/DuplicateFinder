@@ -33,12 +33,24 @@ class HomeViewModel @Inject constructor(
             try {
                 val imageCount = imageRepository.getImageCount()
                 val lastScan = settingsRepository.lastScanTimestamp.first()
+                val folders = imageRepository.getFolders()
+                val selectedFolders = settingsRepository.scanFolders.first()
+                val validSelection = if (folders.isEmpty()) {
+                    emptySet()
+                } else {
+                    selectedFolders.intersect(folders.toSet())
+                }
+                if (validSelection != selectedFolders) {
+                    settingsRepository.setScanFolders(validSelection)
+                }
 
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         totalImages = imageCount,
                         lastScanTimestamp = lastScan,
+                        availableFolders = folders,
+                        selectedFolders = validSelection,
                         error = null
                     )
                 }
@@ -50,6 +62,13 @@ class HomeViewModel @Inject constructor(
                     )
                 }
             }
+        }
+    }
+
+    fun setSelectedFolders(folders: Set<String>) {
+        viewModelScope.launch {
+            settingsRepository.setScanFolders(folders)
+            _uiState.update { it.copy(selectedFolders = folders) }
         }
     }
 

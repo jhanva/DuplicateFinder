@@ -33,7 +33,7 @@ fun testImage(
 )
 
 open class BaseImageRepositoryFake : ImageRepository {
-    override suspend fun getAllImages(): List<ImageItem> = emptyList()
+    override suspend fun getAllImages(folders: Set<String>): List<ImageItem> = emptyList()
 
     override fun scanImagesWithProgress(): Flow<ScanProgress> = flowOf()
 
@@ -67,7 +67,7 @@ open class BaseImageRepositoryFake : ImageRepository {
 
     override suspend fun getFolders(): List<String> = emptyList()
 
-    override suspend fun getImageCount(): Int = 0
+    override suspend fun getImageCount(folders: Set<String>): Int = 0
 }
 
 class FakeSettingsRepository(
@@ -77,6 +77,7 @@ class FakeSettingsRepository(
     override val autoDeleteDays: Flow<Int> = MutableStateFlow(30)
     override val isDarkMode: Flow<Boolean> = MutableStateFlow(false)
     override val excludedFolders: Flow<Set<String>> = MutableStateFlow(emptySet())
+    override val scanFolders: Flow<Set<String>> = MutableStateFlow(emptySet())
     override val lastScanTimestamp: Flow<Long> = MutableStateFlow(0L)
     override val scanMode: Flow<ScanMode> = MutableStateFlow(ScanMode.EXACT_AND_SIMILAR)
 
@@ -87,6 +88,8 @@ class FakeSettingsRepository(
     override suspend fun setDarkMode(enabled: Boolean) = Unit
 
     override suspend fun setExcludedFolders(folders: Set<String>) = Unit
+
+    override suspend fun setScanFolders(folders: Set<String>) = Unit
 
     override suspend fun setLastScanTimestamp(timestamp: Long) = Unit
 

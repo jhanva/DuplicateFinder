@@ -7,6 +7,8 @@ data class HomeUiState(
     val spaceRecoverable: Long = 0,
     val lastScanTimestamp: Long = 0,
     val hasPermission: Boolean = false,
+    val availableFolders: List<String> = emptyList(),
+    val selectedFolders: Set<String> = emptySet(),
     val error: String? = null
 ) {
     val hasScannedBefore: Boolean

@@ -18,7 +18,7 @@ class ScanImagesUseCaseTest {
     @Test
     fun `when there are no images emits loading hashing and complete with empty result`() = runTest {
         val repo = object : BaseImageRepositoryFake() {
-            override suspend fun getAllImages(): List<ImageItem> = emptyList()
+            override suspend fun getAllImages(folders: Set<String>): List<ImageItem> = emptyList()
         }
         val useCase = ScanImagesUseCase(repo)
 
@@ -41,7 +41,7 @@ class ScanImagesUseCaseTest {
             val md5Requests = Collections.synchronizedList(mutableListOf<Long>())
             var savedUpdates: List<ImageHashUpdate> = emptyList()
 
-            override suspend fun getAllImages(): List<ImageItem> = listOf(image1, image2, image3)
+            override suspend fun getAllImages(folders: Set<String>): List<ImageItem> = listOf(image1, image2, image3)
 
             override suspend fun calculateMd5Hash(image: ImageItem): String? {
                 md5Requests.add(image.id)

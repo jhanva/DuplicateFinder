@@ -39,8 +39,8 @@ class ImageRepositoryImpl @Inject constructor(
 
     private val contentResolver: ContentResolver = context.contentResolver
 
-    override suspend fun getAllImages(): List<ImageItem> {
-        return mediaStoreDataSource.getAllImages()
+    override suspend fun getAllImages(folders: Set<String>): List<ImageItem> {
+        return mediaStoreDataSource.getAllImages(folders)
     }
 
     override fun scanImagesWithProgress(): Flow<ScanProgress> = flow {
@@ -370,8 +370,8 @@ class ImageRepositoryImpl @Inject constructor(
         return mediaStoreDataSource.getFolders()
     }
 
-    override suspend fun getImageCount(): Int {
-        return mediaStoreDataSource.getImageCount()
+    override suspend fun getImageCount(folders: Set<String>): Int {
+        return mediaStoreDataSource.getImageCount(folders)
     }
 }
 

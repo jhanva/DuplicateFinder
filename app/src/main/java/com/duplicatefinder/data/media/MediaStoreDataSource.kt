@@ -37,16 +37,17 @@ class MediaStoreDataSource @Inject constructor(
         MediaStore.Images.Media.BUCKET_DISPLAY_NAME
     )
 
-    suspend fun getAllImages(): List<ImageItem> = withContext(Dispatchers.IO) {
+    suspend fun getAllImages(folders: Set<String> = emptySet()): List<ImageItem> = withContext(Dispatchers.IO) {
         val images = mutableListOf<ImageItem>()
 
         val sortOrder = "${MediaStore.Images.Media.DATE_MODIFIED} DESC"
+        val (selection, selectionArgs) = buildFolderSelection(folders)
 
         contentResolver.query(
             collection,
             projection,
-            null,
-            null,
+            selection,
+            selectionArgs,
             sortOrder
         )?.use { cursor ->
             val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
@@ -153,13 +154,22 @@ class MediaStoreDataSource @Inject constructor(
         folders.toList().sorted()
     }
 
-    suspend fun getImageCount(): Int = withContext(Dispatchers.IO) {
+    suspend fun getImageCount(folders: Set<String> = emptySet()): Int = withContext(Dispatchers.IO) {
+        val (selection, selectionArgs) = buildFolderSelection(folders)
         contentResolver.query(
             collection,
             arrayOf(MediaStore.Images.Media._ID),
-            null,
-            null,
+            selection,
+            selectionArgs,
             null
         )?.use { it.count } ?: 0
+    }
+
+    private fun buildFolderSelection(folders: Set<String>): Pair<String?, Array<String>?> {
+        if (folders.isEmpty()) return null to null
+
+        val placeholders = folders.joinToString(",") { "?" }
+        val selection = "${MediaStore.Images.Media.BUCKET_DISPLAY_NAME} IN ($placeholders)"
+        return selection to folders.toTypedArray()
     }
 }

@@ -42,7 +42,19 @@ class ScanViewModel @Inject constructor(
                 }
 
                 val scanMode = settingsRepository.scanMode.first()
-                scanImagesUseCase(scanMode).collect { (progress, images) ->
+                val selectedFolders = settingsRepository.scanFolders.first()
+
+                if (selectedFolders.isEmpty()) {
+                    _uiState.update {
+                        it.copy(
+                            scanProgress = ScanProgress(ScanPhase.ERROR, 0, 0),
+                            error = "Select at least one folder to scan."
+                        )
+                    }
+                    return@launch
+                }
+
+                scanImagesUseCase(scanMode, selectedFolders).collect { (progress, images) ->
                     _uiState.update { it.copy(scanProgress = progress) }
 
                     if (progress.phase == ScanPhase.COMPLETE && images.isNotEmpty()) {

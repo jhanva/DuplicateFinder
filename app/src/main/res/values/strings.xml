@@ -18,6 +18,10 @@
     <string name="home_space_recoverable">Space Recoverable</string>
     <string name="home_last_scan">Last Scan</string>
     <string name="home_never_scanned">Never</string>
+    <string name="home_scan_folders">Folders to Scan</string>
+    <string name="home_scan_folders_none">No folders selected</string>
+    <string name="home_scan_folders_select">Select Folders</string>
+    <string name="home_scan_folders_required">Select at least one folder to start scanning.</string>
 
     <!-- Scan Screen -->
     <string name="scan_title">Scanning</string>
@@ -28,10 +32,17 @@
     <string name="scan_progress">%1$d of %2$d</string>
     <string name="scan_cancel">Cancel</string>
     <string name="scan_view_results">View Results</string>
+    <string name="scan_select_folders_title">Select folders to scan</string>
+    <string name="scan_no_folders">No folders found</string>
+    <string name="scan_clear_selection">Clear</string>
+    <string name="scan_select_all">Select All</string>
+    <string name="scan_apply_folders">Use Selection</string>
+    <string name="scan_select_folders_required">Select at least one folder to scan.</string>
 
     <!-- Duplicates Screen -->
     <string name="duplicates_title">Duplicates</string>
     <string name="duplicates_empty">No duplicates found</string>
+    <string name="duplicates_select_folders">Select folders to scan from the Home screen</string>
     <string name="duplicates_groups">%1$d groups found</string>
     <string name="duplicates_select_all">Select All</string>
     <string name="duplicates_deselect_all">Deselect All</string>

@@ -42,7 +42,21 @@ class DuplicatesViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true) }
 
             try {
-                val images = imageRepository.getAllImages()
+                val selectedFolders = settingsRepository.scanFolders.first()
+                if (selectedFolders.isEmpty()) {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            duplicateGroups = emptyList(),
+                            filteredGroups = emptyList(),
+                            requiresFolderSelection = true,
+                            error = null
+                        )
+                    }
+                    return@launch
+                }
+
+                val images = imageRepository.getAllImages(selectedFolders)
                 val cachedHashes = imageRepository.getCachedHashes(images.map { it.id })
                 val scanMode = settingsRepository.scanMode.first()
                 val computeSimilar = scanMode == ScanMode.EXACT_AND_SIMILAR
@@ -93,6 +107,7 @@ class DuplicatesViewModel @Inject constructor(
                         isLoading = false,
                         duplicateGroups = duplicates,
                         filteredGroups = duplicates,
+                        requiresFolderSelection = false,
                         error = null
                     )
                 }
@@ -100,6 +115,7 @@ class DuplicatesViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isLoading = false,
+                        requiresFolderSelection = false,
                         error = e.message
                     )
                 }

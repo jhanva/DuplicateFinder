@@ -20,11 +20,12 @@ class ScanImagesUseCase @Inject constructor(
     private val imageRepository: ImageRepository
 ) {
     operator fun invoke(
-        scanMode: ScanMode
+        scanMode: ScanMode,
+        folders: Set<String> = emptySet()
     ): Flow<Pair<ScanProgress, List<ImageItem>>> = channelFlow {
         send(ScanProgress(ScanPhase.LOADING, 0, 0) to emptyList())
 
-        val images = imageRepository.getAllImages()
+        val images = imageRepository.getAllImages(folders)
         val total = images.size
         val cachedHashes = imageRepository.getCachedHashes(images.map { it.id })
         val sizeCounts = images.groupingBy { it.size }.eachCount()

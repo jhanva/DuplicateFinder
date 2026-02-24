@@ -8,6 +8,7 @@ interface SettingsRepository {
     val autoDeleteDays: Flow<Int>
     val isDarkMode: Flow<Boolean>
     val excludedFolders: Flow<Set<String>>
+    val scanFolders: Flow<Set<String>>
     val lastScanTimestamp: Flow<Long>
     val scanMode: Flow<ScanMode>
 
@@ -15,6 +16,7 @@ interface SettingsRepository {
     suspend fun setAutoDeleteDays(days: Int)
     suspend fun setDarkMode(enabled: Boolean)
     suspend fun setExcludedFolders(folders: Set<String>)
+    suspend fun setScanFolders(folders: Set<String>)
     suspend fun setLastScanTimestamp(timestamp: Long)
     suspend fun setScanMode(mode: ScanMode)
 }

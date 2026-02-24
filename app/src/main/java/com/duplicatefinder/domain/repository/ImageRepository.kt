@@ -9,7 +9,7 @@ import com.duplicatefinder.domain.model.ScanProgress
 import kotlinx.coroutines.flow.Flow
 
 interface ImageRepository {
-    suspend fun getAllImages(): List<ImageItem>
+    suspend fun getAllImages(folders: Set<String> = emptySet()): List<ImageItem>
 
     fun scanImagesWithProgress(): Flow<ScanProgress>
 
@@ -42,5 +42,5 @@ interface ImageRepository {
 
     suspend fun getFolders(): List<String>
 
-    suspend fun getImageCount(): Int
+    suspend fun getImageCount(folders: Set<String> = emptySet()): Int
 }

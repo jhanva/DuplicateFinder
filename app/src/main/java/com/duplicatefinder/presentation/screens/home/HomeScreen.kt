@@ -26,9 +26,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -38,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.duplicatefinder.R
+import com.duplicatefinder.presentation.components.FolderPickerBottomSheet
 import com.duplicatefinder.presentation.components.PermissionHandler
 import com.duplicatefinder.util.extension.formatFileSize
 import com.duplicatefinder.util.extension.toRelativeTimeString
@@ -50,6 +55,21 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var showFolderSheet by remember { mutableStateOf(false) }
+    val folderSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    if (showFolderSheet) {
+        FolderPickerBottomSheet(
+            sheetState = folderSheetState,
+            availableFolders = uiState.availableFolders,
+            currentSelection = uiState.selectedFolders,
+            onApply = { selection ->
+                viewModel.setSelectedFolders(selection)
+                showFolderSheet = false
+            },
+            onDismiss = { showFolderSheet = false }
+        )
+    }
 
     PermissionHandler {
         Scaffold(
@@ -143,13 +163,70 @@ fun HomeScreen(
                         )
                     }
 
+                    if (uiState.availableFolders.isNotEmpty()) {
+                        val selectedList = uiState.selectedFolders.toList().sorted()
+                        val selectedSummary = when {
+                            selectedList.isEmpty() -> stringResource(R.string.home_scan_folders_none)
+                            selectedList.size <= 3 -> selectedList.joinToString(", ")
+                            else -> selectedList.take(3).joinToString(", ") +
+                                " +${selectedList.size - 3}"
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.home_scan_folders),
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text(
+                                    text = selectedSummary,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                OutlinedButton(
+                                    onClick = { showFolderSheet = true },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(stringResource(R.string.home_scan_folders_select))
+                                }
+
+                                if (uiState.selectedFolders.isEmpty()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = stringResource(R.string.home_scan_folders_required),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.weight(1f))
 
                     Button(
                         onClick = onStartScan,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(56.dp)
+                            .height(56.dp),
+                        enabled = uiState.selectedFolders.isNotEmpty()
                     ) {
                         Icon(
                             imageVector = Icons.Default.Search,

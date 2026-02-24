@@ -29,6 +29,7 @@ class SettingsDataStore @Inject constructor(
         val AUTO_DELETE_DAYS = intPreferencesKey("auto_delete_days")
         val IS_DARK_MODE = booleanPreferencesKey("is_dark_mode")
         val EXCLUDED_FOLDERS = stringSetPreferencesKey("excluded_folders")
+        val SCAN_FOLDERS = stringSetPreferencesKey("scan_folders")
         val LAST_SCAN_TIMESTAMP = longPreferencesKey("last_scan_timestamp")
         val SCAN_MODE = stringPreferencesKey("scan_mode")
     }
@@ -47,6 +48,10 @@ class SettingsDataStore @Inject constructor(
 
     val excludedFolders: Flow<Set<String>> = context.dataStore.data.map { preferences ->
         preferences[Keys.EXCLUDED_FOLDERS] ?: emptySet()
+    }
+
+    val scanFolders: Flow<Set<String>> = context.dataStore.data.map { preferences ->
+        preferences[Keys.SCAN_FOLDERS] ?: emptySet()
     }
 
     val lastScanTimestamp: Flow<Long> = context.dataStore.data.map { preferences ->
@@ -82,6 +87,12 @@ class SettingsDataStore @Inject constructor(
     suspend fun setExcludedFolders(folders: Set<String>) {
         context.dataStore.edit { preferences ->
             preferences[Keys.EXCLUDED_FOLDERS] = folders
+        }
+    }
+
+    suspend fun setScanFolders(folders: Set<String>) {
+        context.dataStore.edit { preferences ->
+            preferences[Keys.SCAN_FOLDERS] = folders
         }
     }
 

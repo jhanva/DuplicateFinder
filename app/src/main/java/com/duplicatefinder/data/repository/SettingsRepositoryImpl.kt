@@ -24,6 +24,9 @@ class SettingsRepositoryImpl @Inject constructor(
     override val excludedFolders: Flow<Set<String>>
         get() = settingsDataStore.excludedFolders
 
+    override val scanFolders: Flow<Set<String>>
+        get() = settingsDataStore.scanFolders
+
     override val lastScanTimestamp: Flow<Long>
         get() = settingsDataStore.lastScanTimestamp
 
@@ -44,6 +47,10 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setExcludedFolders(folders: Set<String>) {
         settingsDataStore.setExcludedFolders(folders)
+    }
+
+    override suspend fun setScanFolders(folders: Set<String>) {
+        settingsDataStore.setScanFolders(folders)
     }
 
     override suspend fun setLastScanTimestamp(timestamp: Long) {

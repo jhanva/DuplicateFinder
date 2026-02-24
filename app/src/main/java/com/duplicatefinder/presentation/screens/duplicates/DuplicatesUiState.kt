@@ -13,6 +13,7 @@ data class DuplicatesUiState(
     val showFilterSheet: Boolean = false,
     val showDeleteDialog: Boolean = false,
     val isDeleting: Boolean = false,
+    val requiresFolderSelection: Boolean = false,
     val error: String? = null
 ) {
     val hasSelection: Boolean

@@ -168,7 +168,25 @@ fun DuplicatesScreen(
                 }
 
                 uiState.isEmpty -> {
+                    val emptyTitle = when {
+                        uiState.requiresFolderSelection ->
+                            stringResource(R.string.scan_select_folders_required)
+                        uiState.error != null ->
+                            stringResource(R.string.error_generic)
+                        else ->
+                            stringResource(R.string.duplicates_empty)
+                    }
+                    val emptySubtitle = when {
+                        uiState.requiresFolderSelection ->
+                            stringResource(R.string.duplicates_select_folders)
+                        uiState.error != null ->
+                            uiState.error ?: ""
+                        else ->
+                            "Scan your gallery to find duplicate images"
+                    }
                     EmptyState(
+                        title = emptyTitle,
+                        subtitle = emptySubtitle,
                         modifier = Modifier.align(Alignment.Center)
                     )
                 }
@@ -230,6 +248,8 @@ fun DuplicatesScreen(
 
 @Composable
 private fun EmptyState(
+    title: String,
+    subtitle: String,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -246,7 +266,7 @@ private fun EmptyState(
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = stringResource(R.string.duplicates_empty),
+            text = title,
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center
         )
@@ -254,7 +274,7 @@ private fun EmptyState(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Scan your gallery to find duplicate images",
+            text = subtitle,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
