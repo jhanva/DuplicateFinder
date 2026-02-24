@@ -1,7 +1,10 @@
 package com.duplicatefinder.data.repository
 
+import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import com.duplicatefinder.data.local.datastore.SettingsDataStore
 import com.duplicatefinder.data.local.db.dao.TrashDao
 import com.duplicatefinder.data.local.db.entities.TrashEntity
@@ -100,22 +103,18 @@ class TrashRepositoryImpl @Inject constructor(
                 items.forEach { item ->
                     try {
                         val trashFile = File(item.trashPath)
-                        val originalFile = File(item.originalPath)
+                        if (!trashFile.exists()) return@forEach
 
-                        if (trashFile.exists()) {
-                            originalFile.parentFile?.mkdirs()
+                        val restored = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            restoreWithMediaStore(item, trashFile)
+                        } else {
+                            restoreWithLegacyPath(item, trashFile)
+                        }
 
-                            FileInputStream(trashFile).use { input ->
-                                FileOutputStream(originalFile).use { output ->
-                                    input.copyTo(output)
-                                }
-                            }
-
-                            if (originalFile.exists()) {
-                                trashFile.delete()
-                                trashDao.deleteByIds(listOf(item.id))
-                                restoredCount++
-                            }
+                        if (restored) {
+                            trashFile.delete()
+                            trashDao.deleteByIds(listOf(item.id))
+                            restoredCount++
                         }
                     } catch (e: Exception) {
                         // Continue with next item
@@ -209,6 +208,52 @@ class TrashRepositoryImpl @Inject constructor(
 
     override suspend fun getTrashItemCount(): Int {
         return trashDao.count()
+    }
+
+    private fun restoreWithMediaStore(item: TrashItem, trashFile: File): Boolean {
+        val relativePath = extractRelativePath(item.originalPath)
+        val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val contentValues = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, item.name)
+            put(MediaStore.Images.Media.MIME_TYPE, item.mimeType)
+            if (!relativePath.isNullOrBlank()) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, relativePath)
+            }
+        }
+
+        val targetUri = context.contentResolver.insert(collection, contentValues) ?: return false
+        return try {
+            context.contentResolver.openOutputStream(targetUri)?.use { output ->
+                FileInputStream(trashFile).use { input ->
+                    input.copyTo(output)
+                }
+            } != null
+        } catch (e: Exception) {
+            context.contentResolver.delete(targetUri, null, null)
+            false
+        }
+    }
+
+    private fun restoreWithLegacyPath(item: TrashItem, trashFile: File): Boolean {
+        val originalFile = File(item.originalPath)
+        originalFile.parentFile?.mkdirs()
+
+        FileInputStream(trashFile).use { input ->
+            FileOutputStream(originalFile).use { output ->
+                input.copyTo(output)
+            }
+        }
+
+        return originalFile.exists()
+    }
+
+    private fun extractRelativePath(originalPath: String): String? {
+        if (originalPath.isBlank()) return null
+
+        val normalized = originalPath.replace('\\', '/')
+        val withoutStoragePrefix = normalized.substringAfter("/storage/emulated/0/", normalized)
+        val parent = withoutStoragePrefix.substringBeforeLast('/', "")
+        return if (parent.isBlank()) null else "$parent/"
     }
 
     private fun TrashEntity.toDomainModel() = TrashItem(
