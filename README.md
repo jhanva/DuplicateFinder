@@ -109,7 +109,9 @@ app/src/main/java/com/duplicatefinder/
 
 - **Min SDK**: 26 (Android 8.0)
 - **Target SDK**: 34 (Android 14)
-- **Recommended Device**: High-end Android device for large gallery scans
+- **Device Baseline (Validated)**: Samsung Galaxy S23 Ultra
+- **Intended Devices**: S23 Ultra-class devices and newer (or equivalent/high-end hardware)
+- **Performance Note**: Older devices may run, but the app is optimized and documented for S23 Ultra and above
 
 ### Development Requirements
 
