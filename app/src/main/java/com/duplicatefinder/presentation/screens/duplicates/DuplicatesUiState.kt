@@ -10,7 +10,6 @@ data class DuplicatesUiState(
     val filteredGroups: List<DuplicateGroup> = emptyList(),
     val selectedImages: Set<Long> = emptySet(),
     val filterCriteria: FilterCriteria = FilterCriteria.empty(),
-    val availableFolders: List<String> = emptyList(),
     val showFilterSheet: Boolean = false,
     val showDeleteDialog: Boolean = false,
     val isDeleting: Boolean = false,

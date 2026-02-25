@@ -97,22 +97,29 @@ class PerceptualHashCalculator @Inject constructor(
     private fun applyDCT(input: Array<DoubleArray>): Array<DoubleArray> {
         val size = input.size
         val result = Array(size) { DoubleArray(size) }
+        val temp = Array(size) { DoubleArray(size) }
         val coefficient = sqrt(2.0 / size)
+        val cosTable = COS_TABLE
 
         for (u in 0 until size) {
-            for (v in 0 until size) {
+            for (j in 0 until size) {
                 var sum = 0.0
-
                 for (i in 0 until size) {
-                    for (j in 0 until size) {
-                        sum += input[i][j] *
-                                cos((2 * i + 1) * u * PI_OVER_2N) *
-                                cos((2 * j + 1) * v * PI_OVER_2N)
-                    }
+                    sum += input[i][j] * cosTable[u][i]
                 }
+                temp[u][j] = sum
+            }
+        }
 
-                val cu = if (u == 0) 1.0 / sqrt(2.0) else 1.0
+        for (u in 0 until size) {
+            val cu = if (u == 0) 1.0 / sqrt(2.0) else 1.0
+            for (v in 0 until size) {
                 val cv = if (v == 0) 1.0 / sqrt(2.0) else 1.0
+
+                var sum = 0.0
+                for (j in 0 until size) {
+                    sum += temp[u][j] * cosTable[v][j]
+                }
 
                 result[u][v] = coefficient * coefficient * cu * cv * sum
             }
@@ -142,6 +149,13 @@ class PerceptualHashCalculator @Inject constructor(
         private const val LOW_FREQ_SIZE = 8
         const val HASH_BITS = LOW_FREQ_SIZE * LOW_FREQ_SIZE - 1
         private val PI_OVER_2N = Math.PI / (2 * HASH_SIZE)
+        private val COS_TABLE: Array<DoubleArray> by lazy {
+            Array(HASH_SIZE) { u ->
+                DoubleArray(HASH_SIZE) { i ->
+                    cos((2 * i + 1) * u * PI_OVER_2N)
+                }
+            }
+        }
 
         fun hammingDistance(hash1: String, hash2: String): Int {
             if (hash1.length != hash2.length) return Int.MAX_VALUE

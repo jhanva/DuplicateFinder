@@ -6,7 +6,7 @@ data class FilterCriteria(
     val minSize: Long? = null,
     val maxSize: Long? = null,
     val mimeTypes: List<String> = emptyList(),
-    val matchTypes: List<MatchType> = listOf(MatchType.EXACT, MatchType.SIMILAR)
+    val matchTypes: List<MatchType> = MatchType.entries.toList()
 ) {
     val hasActiveFilters: Boolean
         get() = folders.isNotEmpty() ||
@@ -14,7 +14,7 @@ data class FilterCriteria(
                 minSize != null ||
                 maxSize != null ||
                 mimeTypes.isNotEmpty() ||
-                matchTypes.size != 2
+                matchTypes.size != MatchType.entries.size
 
     companion object {
         fun empty() = FilterCriteria()

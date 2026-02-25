@@ -23,7 +23,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.duplicatefinder.R
 import com.duplicatefinder.domain.model.FilterCriteria
 import com.duplicatefinder.domain.model.MatchType
 
@@ -32,14 +34,10 @@ import com.duplicatefinder.domain.model.MatchType
 fun FilterBottomSheet(
     sheetState: SheetState,
     currentFilter: FilterCriteria,
-    availableFolders: List<String>,
     onApply: (FilterCriteria) -> Unit,
     onReset: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    var selectedFolders by remember(currentFilter) {
-        mutableStateOf(currentFilter.folders.toSet())
-    }
     var selectedMatchTypes by remember(currentFilter) {
         mutableStateOf(currentFilter.matchTypes.toSet())
     }
@@ -54,14 +52,14 @@ fun FilterBottomSheet(
                 .padding(16.dp)
         ) {
             Text(
-                text = "Filters",
+                text = stringResource(R.string.filter_title),
                 style = MaterialTheme.typography.headlineSmall
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Match Type",
+                text = stringResource(R.string.filter_match_type),
                 style = MaterialTheme.typography.titleMedium
             )
 
@@ -80,38 +78,16 @@ fun FilterBottomSheet(
                                 selectedMatchTypes + matchType
                             }
                         },
-                        label = { Text(matchType.name.lowercase().replaceFirstChar { it.uppercase() }) }
-                    )
-                }
-            }
-
-            if (availableFolders.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "Folders",
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    availableFolders.take(10).forEach { folder ->
-                        FilterChip(
-                            selected = folder in selectedFolders,
-                            onClick = {
-                                selectedFolders = if (folder in selectedFolders) {
-                                    selectedFolders - folder
-                                } else {
-                                    selectedFolders + folder
+                        label = {
+                            Text(
+                                text = when (matchType) {
+                                    MatchType.EXACT -> stringResource(R.string.filter_match_exact)
+                                    MatchType.SIMILAR -> stringResource(R.string.filter_match_similar)
+                                    MatchType.BOTH -> stringResource(R.string.filter_match_both)
                                 }
-                            },
-                            label = { Text(folder) }
-                        )
-                    }
+                            )
+                        }
+                    )
                 }
             }
 
@@ -123,27 +99,35 @@ fun FilterBottomSheet(
             ) {
                 OutlinedButton(
                     onClick = {
-                        selectedFolders = emptySet()
                         selectedMatchTypes = MatchType.entries.toSet()
                         onReset()
                     },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Reset")
+                    Text(stringResource(R.string.filter_reset))
                 }
 
                 Button(
                     onClick = {
+                        val typesToApply = if (selectedMatchTypes.isEmpty()) {
+                            MatchType.entries.toSet()
+                        } else {
+                            selectedMatchTypes
+                        }
                         onApply(
                             currentFilter.copy(
-                                folders = selectedFolders.toList(),
-                                matchTypes = selectedMatchTypes.toList()
+                                folders = emptyList(),
+                                dateRange = null,
+                                minSize = null,
+                                maxSize = null,
+                                mimeTypes = emptyList(),
+                                matchTypes = typesToApply.toList()
                             )
                         )
                     },
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Apply")
+                    Text(stringResource(R.string.filter_apply))
                 }
             }
 

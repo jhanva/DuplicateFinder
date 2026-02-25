@@ -67,7 +67,7 @@ class ScanImagesUseCase @Inject constructor(
             val hashUpdates = arrayOfNulls<ImageHashUpdate>(batch.size)
             val workChannel = Channel<Int>(Channel.BUFFERED)
 
-            val workers = List(HASH_PARALLELISM) {
+            val workers = List(hashParallelism()) {
                 launch {
                     for (index in workChannel) {
                         val image = batch[index]
@@ -154,7 +154,11 @@ class ScanImagesUseCase @Inject constructor(
 
     companion object {
         private const val PROGRESS_STEP = 20
-        private const val HASH_PARALLELISM = 4
         private const val BATCH_SIZE = 500
+
+        private fun hashParallelism(): Int {
+            val cores = Runtime.getRuntime().availableProcessors()
+            return cores.coerceIn(2, 8)
+        }
     }
 }

@@ -26,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -73,7 +74,9 @@ fun HomeScreen(
         )
     }
 
-    PermissionHandler {
+    PermissionHandler(
+        onPermissionChanged = viewModel::setPermissionGranted
+    ) {
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -166,78 +169,111 @@ fun HomeScreen(
                         )
                     }
 
-                    if (uiState.availableFolders.isNotEmpty()) {
-                        val selectedList = uiState.selectedFolders.toList().sorted()
-                        val selectedSummary = when {
-                            selectedList.isEmpty() -> stringResource(R.string.home_scan_folders_none)
-                            selectedList.size <= 3 -> selectedList.joinToString(", ")
-                            else -> selectedList.take(3).joinToString(", ") +
-                                " +${selectedList.size - 3}"
-                        }
+                    val selectedList = uiState.selectedFolders.toList().sorted()
+                    val selectedSummary = when {
+                        uiState.availableFolders.isEmpty() ->
+                            stringResource(R.string.home_scan_folders_not_found)
+                        selectedList.isEmpty() -> stringResource(R.string.home_scan_folders_none)
+                        selectedList.size <= 3 -> selectedList.joinToString(", ")
+                        else -> selectedList.take(3).joinToString(", ") + " +${selectedList.size - 3}"
+                    }
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
                         ) {
-                            Column(
+                            Text(
+                                text = stringResource(R.string.home_scan_folders),
+                                style = MaterialTheme.typography.titleMedium
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = selectedSummary,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            OutlinedButton(
+                                onClick = { showFolderSheet = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(stringResource(R.string.home_scan_folders_select))
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedButton(
+                                onClick = { viewModel.loadData() },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(stringResource(R.string.home_scan_folders_refresh))
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = stringResource(R.string.home_exact_only_title),
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.home_exact_only_subtitle),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Switch(
+                                    checked = uiState.isExactOnly,
+                                    onCheckedChange = { viewModel.setExactOnly(it) }
+                                )
+                            }
+
+                            if (uiState.selectedFolders.isEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = stringResource(R.string.home_scan_folders_required),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Button(
+                                onClick = onStartScan,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(16.dp)
+                                    .height(56.dp),
+                                enabled = uiState.selectedFolders.isNotEmpty()
                             ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = null
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = stringResource(R.string.home_scan_folders),
+                                    text = stringResource(R.string.home_start_scan),
                                     style = MaterialTheme.typography.titleMedium
                                 )
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                Text(
-                                    text = selectedSummary,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                OutlinedButton(
-                                    onClick = { showFolderSheet = true },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text(stringResource(R.string.home_scan_folders_select))
-                                }
-
-                                if (uiState.selectedFolders.isEmpty()) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = stringResource(R.string.home_scan_folders_required),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                Button(
-                                    onClick = onStartScan,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(56.dp),
-                                    enabled = uiState.selectedFolders.isNotEmpty()
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Search,
-                                        contentDescription = null
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = stringResource(R.string.home_start_scan),
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-                                }
                             }
                         }
                     }

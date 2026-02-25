@@ -36,6 +36,7 @@ import com.duplicatefinder.R
 
 @Composable
 fun PermissionHandler(
+    onPermissionChanged: (Boolean) -> Unit = {},
     onPermissionGranted: @Composable () -> Unit
 ) {
     val context = LocalContext.current
@@ -62,6 +63,10 @@ fun PermissionHandler(
         if (!hasPermission && !permissionRequested) {
             launcher.launch(permission)
         }
+    }
+
+    LaunchedEffect(hasPermission) {
+        onPermissionChanged(hasPermission)
     }
 
     if (hasPermission) {

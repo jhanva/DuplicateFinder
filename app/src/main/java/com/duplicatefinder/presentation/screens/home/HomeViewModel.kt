@@ -2,6 +2,7 @@ package com.duplicatefinder.presentation.screens.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.duplicatefinder.domain.model.ScanMode
 import com.duplicatefinder.domain.repository.ImageRepository
 import com.duplicatefinder.domain.repository.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,16 +23,13 @@ class HomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    init {
-        loadData()
-    }
-
     fun loadData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
             try {
                 val lastScan = settingsRepository.lastScanTimestamp.first()
+                val scanMode = settingsRepository.scanMode.first()
                 val folders = imageRepository.getFolders()
                 val selectedFolders = settingsRepository.scanFolders.first()
                 val validSelection = if (folders.isEmpty()) {
@@ -55,6 +53,7 @@ class HomeViewModel @Inject constructor(
                         lastScanTimestamp = lastScan,
                         availableFolders = folders,
                         selectedFolders = validSelection,
+                        scanMode = scanMode,
                         error = null
                     )
                 }
@@ -71,8 +70,22 @@ class HomeViewModel @Inject constructor(
 
     fun setSelectedFolders(folders: Set<String>) {
         viewModelScope.launch {
-            settingsRepository.setScanFolders(folders)
-            _uiState.update { it.copy(selectedFolders = folders) }
+            try {
+                settingsRepository.setScanFolders(folders)
+                val imageCount = if (folders.isEmpty()) {
+                    0
+                } else {
+                    imageRepository.getImageCount(folders)
+                }
+                _uiState.update {
+                    it.copy(
+                        selectedFolders = folders,
+                        totalImages = imageCount
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = e.message) }
+            }
         }
     }
 
@@ -80,6 +93,14 @@ class HomeViewModel @Inject constructor(
         _uiState.update { it.copy(hasPermission = granted) }
         if (granted) {
             loadData()
+        }
+    }
+
+    fun setExactOnly(enabled: Boolean) {
+        viewModelScope.launch {
+            val mode = if (enabled) ScanMode.EXACT else ScanMode.EXACT_AND_SIMILAR
+            settingsRepository.setScanMode(mode)
+            _uiState.update { it.copy(scanMode = mode) }
         }
     }
 

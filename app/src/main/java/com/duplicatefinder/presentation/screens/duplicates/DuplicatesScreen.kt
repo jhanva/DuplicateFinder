@@ -81,7 +81,6 @@ fun DuplicatesScreen(
         FilterBottomSheet(
             sheetState = sheetState,
             currentFilter = uiState.filterCriteria,
-            availableFolders = uiState.availableFolders,
             onApply = { viewModel.applyFilter(it) },
             onReset = { viewModel.resetFilter() },
             onDismiss = { viewModel.hideFilterSheet() }

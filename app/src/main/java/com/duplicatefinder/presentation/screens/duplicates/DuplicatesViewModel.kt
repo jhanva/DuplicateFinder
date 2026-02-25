@@ -37,7 +37,6 @@ class DuplicatesViewModel @Inject constructor(
 
     init {
         loadDuplicates()
-        loadFolders()
     }
 
     private fun loadDuplicates() {
@@ -134,17 +133,6 @@ class DuplicatesViewModel @Inject constructor(
                         error = e.message
                     )
                 }
-            }
-        }
-    }
-
-    private fun loadFolders() {
-        viewModelScope.launch {
-            try {
-                val folders = imageRepository.getFolders()
-                _uiState.update { it.copy(availableFolders = folders) }
-            } catch (e: Exception) {
-                // Ignore folder loading errors
             }
         }
     }

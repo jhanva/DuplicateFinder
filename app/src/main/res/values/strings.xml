@@ -20,8 +20,12 @@
     <string name="home_never_scanned">Never</string>
     <string name="home_scan_folders">Folders to Scan</string>
     <string name="home_scan_folders_none">No folders selected</string>
+    <string name="home_scan_folders_not_found">No folders detected yet. Tap refresh.</string>
     <string name="home_scan_folders_select">Select Folders</string>
+    <string name="home_scan_folders_refresh">Refresh Folders</string>
     <string name="home_scan_folders_required">Select at least one folder to start scanning.</string>
+    <string name="home_exact_only_title">Exact only</string>
+    <string name="home_exact_only_subtitle">Faster scan, ignores similar matches</string>
 
     <!-- Scan Screen -->
     <string name="scan_title">Scanning</string>
@@ -93,6 +97,10 @@
 
     <!-- Filters -->
     <string name="filter_title">Filters</string>
+    <string name="filter_match_type">Match Type</string>
+    <string name="filter_match_exact">Exact</string>
+    <string name="filter_match_similar">Similar</string>
+    <string name="filter_match_both">Both</string>
     <string name="filter_folders">Folders</string>
     <string name="filter_date_range">Date Range</string>
     <string name="filter_size">File Size</string>
