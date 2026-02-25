@@ -50,6 +50,8 @@ class TrashRepositoryImpl @Inject constructor(
     override suspend fun moveToTrash(images: List<ImageItem>): Result<Int> =
         withContext(Dispatchers.IO) {
             try {
+                if (images.isEmpty()) return@withContext Result.success(0)
+
                 val autoDeleteDays = settingsDataStore.autoDeleteDays.first()
                 val now = System.currentTimeMillis()
                 val expiresAt = now + (autoDeleteDays * 24 * 60 * 60 * 1000L)
@@ -58,7 +60,7 @@ class TrashRepositoryImpl @Inject constructor(
                 var failedCount = 0
                 var lastError: Exception? = null
 
-                for (image in images) {
+                for ((index, image) in images.withIndex()) {
                     val trashFile = File(trashDir, "${image.id}_${image.name}")
                     try {
                         val inputStream = context.contentResolver.openInputStream(image.uri)
@@ -103,7 +105,21 @@ class TrashRepositoryImpl @Inject constructor(
                         if (trashFile.exists()) {
                             trashFile.delete()
                         }
-                        lastError = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                        lastError = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                            val pendingUris = images
+                                .drop(index)
+                                .map { it.uri }
+                                .distinct()
+                            val intentSender = MediaStore.createWriteRequest(
+                                context.contentResolver,
+                                pendingUris
+                            ).intentSender
+                            UserConfirmationRequiredException(
+                                intentSender = intentSender,
+                                message = "Moving to trash requires user confirmation."
+                            )
+                        } else if (
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
                             securityException is RecoverableSecurityException
                         ) {
                             UserConfirmationRequiredException(
