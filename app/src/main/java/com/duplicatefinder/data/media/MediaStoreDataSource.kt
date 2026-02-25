@@ -5,6 +5,7 @@ import android.content.ContentUris
 import android.content.Context
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.provider.MediaStore
 import android.database.Cursor
 import com.duplicatefinder.domain.model.ImageItem
@@ -69,15 +70,24 @@ class MediaStoreDataSource @Inject constructor(
 
         val images = mutableListOf<ImageItem>()
         val (selection, selectionArgs) = buildFolderSelection(folders)
-        val sortOrder = "${MediaStore.Images.Media.DATE_MODIFIED} DESC LIMIT $limit OFFSET $offset"
+        val args = Bundle().apply {
+            putStringArray(
+                ContentResolver.QUERY_ARG_SORT_COLUMNS,
+                arrayOf(MediaStore.Images.Media.DATE_MODIFIED)
+            )
+            putInt(
+                ContentResolver.QUERY_ARG_SORT_DIRECTION,
+                ContentResolver.QUERY_SORT_DIRECTION_DESCENDING
+            )
+            putInt(ContentResolver.QUERY_ARG_LIMIT, limit)
+            putInt(ContentResolver.QUERY_ARG_OFFSET, offset)
+            if (!selection.isNullOrBlank() && selectionArgs != null) {
+                putString(ContentResolver.QUERY_ARG_SQL_SELECTION, selection)
+                putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, selectionArgs)
+            }
+        }
 
-        contentResolver.query(
-            collection,
-            projection,
-            selection,
-            selectionArgs,
-            sortOrder
-        )?.use { cursor ->
+        contentResolver.query(collection, projection, args, null)?.use { cursor ->
             while (cursor.moveToNext()) {
                 images.add(cursor.toImageItem())
             }

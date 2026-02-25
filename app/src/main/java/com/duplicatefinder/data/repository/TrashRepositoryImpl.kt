@@ -20,6 +20,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -52,12 +53,18 @@ class TrashRepositoryImpl @Inject constructor(
                 val expiresAt = now + (autoDeleteDays * 24 * 60 * 60 * 1000L)
 
                 var movedCount = 0
+                var failedCount = 0
+                var lastError: Exception? = null
 
                 images.forEach { image ->
+                    val trashFile = File(trashDir, "${image.id}_${image.name}")
                     try {
-                        val trashFile = File(trashDir, "${image.id}_${image.name}")
-
-                        val inputStream = context.contentResolver.openInputStream(image.uri) ?: return@forEach
+                        val inputStream = context.contentResolver.openInputStream(image.uri)
+                        if (inputStream == null) {
+                            failedCount++
+                            lastError = IOException("Failed to open source image: ${image.name}")
+                            return@forEach
+                        }
                         inputStream.use { input ->
                             FileOutputStream(trashFile).use { output ->
                                 input.copyTo(output)
@@ -82,14 +89,29 @@ class TrashRepositoryImpl @Inject constructor(
                                 movedCount++
                             } else {
                                 trashFile.delete()
+                                failedCount++
+                                lastError = IOException("Failed to delete source image: ${image.name}")
                             }
+                        } else {
+                            failedCount++
+                            lastError = IOException("Failed to copy image to trash: ${image.name}")
                         }
                     } catch (e: Exception) {
-                        // Continue with next image
+                        failedCount++
+                        lastError = e
+                        if (trashFile.exists()) {
+                            trashFile.delete()
+                        }
                     }
                 }
 
-                Result.success(movedCount)
+                if (movedCount == 0 && failedCount > 0) {
+                    Result.failure(
+                        lastError ?: IOException("Failed to move ${images.size} image(s) to trash.")
+                    )
+                } else {
+                    Result.success(movedCount)
+                }
             } catch (e: Exception) {
                 Result.failure(e)
             }

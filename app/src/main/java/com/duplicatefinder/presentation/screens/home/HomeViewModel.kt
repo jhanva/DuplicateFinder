@@ -84,7 +84,7 @@ class HomeViewModel @Inject constructor(
             it.copy(
                 duplicatesFound = duplicatesFound,
                 spaceRecoverable = spaceRecoverable,
-                lastScanTimestamp = System.currentTimeMillis()
+                lastScanTimestamp = System.currentTimeMillis() / 1000
             )
         }
     }

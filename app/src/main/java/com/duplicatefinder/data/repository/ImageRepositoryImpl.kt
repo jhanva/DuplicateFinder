@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -351,6 +352,8 @@ class ImageRepositoryImpl @Inject constructor(
         withContext(Dispatchers.IO) {
             try {
                 var deletedCount = 0
+                var failedCount = 0
+                var lastError: Exception? = null
 
                 images.forEach { image ->
                     try {
@@ -358,17 +361,34 @@ class ImageRepositoryImpl @Inject constructor(
                         if (result > 0) {
                             imageHashDao.deleteByImageId(image.id)
                             deletedCount++
+                        } else {
+                            failedCount++
                         }
                     } catch (securityException: SecurityException) {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            val recoverableException =
-                                securityException as? RecoverableSecurityException
-                            recoverableException?.userAction?.actionIntent?.intentSender
+                        failedCount++
+                        lastError = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                            securityException is RecoverableSecurityException
+                        ) {
+                            IOException(
+                                "Deletion requires user confirmation for one or more items.",
+                                securityException
+                            )
+                        } else {
+                            securityException
                         }
+                    } catch (e: Exception) {
+                        failedCount++
+                        lastError = e
                     }
                 }
 
-                Result.success(deletedCount)
+                if (deletedCount == 0 && failedCount > 0) {
+                    Result.failure(
+                        lastError ?: IOException("Failed to delete ${images.size} image(s).")
+                    )
+                } else {
+                    Result.success(deletedCount)
+                }
             } catch (e: Exception) {
                 Result.failure(e)
             }
