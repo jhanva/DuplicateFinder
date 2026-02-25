@@ -31,7 +31,6 @@ class HomeViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true) }
 
             try {
-                val imageCount = imageRepository.getImageCount()
                 val lastScan = settingsRepository.lastScanTimestamp.first()
                 val folders = imageRepository.getFolders()
                 val selectedFolders = settingsRepository.scanFolders.first()
@@ -42,6 +41,11 @@ class HomeViewModel @Inject constructor(
                 }
                 if (validSelection != selectedFolders) {
                     settingsRepository.setScanFolders(validSelection)
+                }
+                val imageCount = if (validSelection.isEmpty()) {
+                    0
+                } else {
+                    imageRepository.getImageCount(validSelection)
                 }
 
                 _uiState.update {

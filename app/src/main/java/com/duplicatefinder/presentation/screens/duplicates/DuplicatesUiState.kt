@@ -1,5 +1,6 @@
 package com.duplicatefinder.presentation.screens.duplicates
 
+import android.content.IntentSender
 import com.duplicatefinder.domain.model.DuplicateGroup
 import com.duplicatefinder.domain.model.FilterCriteria
 
@@ -14,6 +15,7 @@ data class DuplicatesUiState(
     val showDeleteDialog: Boolean = false,
     val isDeleting: Boolean = false,
     val requiresFolderSelection: Boolean = false,
+    val pendingDeleteIntentSender: IntentSender? = null,
     val error: String? = null
 ) {
     val hasSelection: Boolean

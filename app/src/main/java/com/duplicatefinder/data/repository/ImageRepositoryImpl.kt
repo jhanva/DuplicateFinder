@@ -15,6 +15,7 @@ import com.duplicatefinder.domain.model.ImageItem
 import com.duplicatefinder.domain.model.MatchType
 import com.duplicatefinder.domain.model.ScanPhase
 import com.duplicatefinder.domain.model.ScanProgress
+import com.duplicatefinder.domain.model.UserConfirmationRequiredException
 import com.duplicatefinder.domain.repository.ImageRepository
 import com.duplicatefinder.util.hash.MD5HashCalculator
 import com.duplicatefinder.util.hash.PerceptualHashCalculator
@@ -369,9 +370,9 @@ class ImageRepositoryImpl @Inject constructor(
                         lastError = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
                             securityException is RecoverableSecurityException
                         ) {
-                            IOException(
-                                "Deletion requires user confirmation for one or more items.",
-                                securityException
+                            UserConfirmationRequiredException(
+                                intentSender = securityException.userAction.actionIntent.intentSender,
+                                message = "Deletion requires user confirmation."
                             )
                         } else {
                             securityException

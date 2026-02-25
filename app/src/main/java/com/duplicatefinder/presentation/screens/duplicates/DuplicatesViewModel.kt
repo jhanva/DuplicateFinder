@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.duplicatefinder.domain.model.FilterCriteria
 import com.duplicatefinder.domain.model.ImageHashUpdate
 import com.duplicatefinder.domain.model.ScanMode
+import com.duplicatefinder.domain.model.UserConfirmationRequiredException
 import com.duplicatefinder.domain.repository.ImageRepository
 import com.duplicatefinder.domain.repository.SettingsRepository
 import com.duplicatefinder.domain.usecase.FilterImagesUseCase
@@ -32,6 +33,7 @@ class DuplicatesViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(DuplicatesUiState())
     val uiState: StateFlow<DuplicatesUiState> = _uiState.asStateFlow()
+    private var pendingDeleteImageIds: Set<Long> = emptySet()
 
     init {
         loadDuplicates()
@@ -219,11 +221,13 @@ class DuplicatesViewModel @Inject constructor(
                 val imagesToDelete = _uiState.value.duplicateGroups
                     .flatMap { it.images }
                     .filter { it.id in selectedIds }
+                pendingDeleteImageIds = selectedIds.toSet()
 
                 val result = moveToTrashUseCase(imagesToDelete)
 
                 result.onSuccess { deletedCount ->
                     if (deletedCount == imagesToDelete.size) {
+                        pendingDeleteImageIds = emptySet()
                         _uiState.update { state ->
                             val updatedGroups = state.duplicateGroups.mapNotNull { group ->
                                 val remainingImages = group.images.filterNot { it.id in selectedIds }
@@ -261,6 +265,15 @@ class DuplicatesViewModel @Inject constructor(
                 }
 
                 result.onFailure { e ->
+                    if (e is UserConfirmationRequiredException) {
+                        _uiState.update {
+                            it.copy(
+                                isDeleting = false,
+                                pendingDeleteIntentSender = e.intentSender
+                            )
+                        }
+                        return@onFailure
+                    }
                     _uiState.update {
                         it.copy(
                             isDeleting = false,
@@ -277,6 +290,17 @@ class DuplicatesViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    fun onDeleteConfirmationResult(granted: Boolean) {
+        _uiState.update { it.copy(pendingDeleteIntentSender = null) }
+        if (!granted) {
+            _uiState.update { it.copy(error = "Delete permission was not granted.") }
+            return
+        }
+
+        if (pendingDeleteImageIds.isEmpty()) return
+        deleteSelectedImages()
     }
 
     fun refresh() {

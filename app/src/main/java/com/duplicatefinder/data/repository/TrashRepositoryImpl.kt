@@ -1,5 +1,6 @@
 package com.duplicatefinder.data.repository
 
+import android.app.RecoverableSecurityException
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
@@ -10,6 +11,7 @@ import com.duplicatefinder.data.local.db.dao.TrashDao
 import com.duplicatefinder.data.local.db.entities.TrashEntity
 import com.duplicatefinder.domain.model.ImageItem
 import com.duplicatefinder.domain.model.TrashItem
+import com.duplicatefinder.domain.model.UserConfirmationRequiredException
 import com.duplicatefinder.domain.repository.TrashRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -56,14 +58,14 @@ class TrashRepositoryImpl @Inject constructor(
                 var failedCount = 0
                 var lastError: Exception? = null
 
-                images.forEach { image ->
+                for (image in images) {
                     val trashFile = File(trashDir, "${image.id}_${image.name}")
                     try {
                         val inputStream = context.contentResolver.openInputStream(image.uri)
                         if (inputStream == null) {
                             failedCount++
                             lastError = IOException("Failed to open source image: ${image.name}")
-                            return@forEach
+                            continue
                         }
                         inputStream.use { input ->
                             FileOutputStream(trashFile).use { output ->
@@ -95,6 +97,24 @@ class TrashRepositoryImpl @Inject constructor(
                         } else {
                             failedCount++
                             lastError = IOException("Failed to copy image to trash: ${image.name}")
+                        }
+                    } catch (securityException: SecurityException) {
+                        failedCount++
+                        if (trashFile.exists()) {
+                            trashFile.delete()
+                        }
+                        lastError = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                            securityException is RecoverableSecurityException
+                        ) {
+                            UserConfirmationRequiredException(
+                                intentSender = securityException.userAction.actionIntent.intentSender,
+                                message = "Moving to trash requires user confirmation."
+                            )
+                        } else {
+                            securityException
+                        }
+                        if (lastError is UserConfirmationRequiredException) {
+                            return@withContext Result.failure(lastError)
                         }
                     } catch (e: Exception) {
                         failedCount++
@@ -245,11 +265,16 @@ class TrashRepositoryImpl @Inject constructor(
 
         val targetUri = context.contentResolver.insert(collection, contentValues) ?: return false
         return try {
-            context.contentResolver.openOutputStream(targetUri)?.use { output ->
+            val copied = context.contentResolver.openOutputStream(targetUri)?.use { output ->
                 FileInputStream(trashFile).use { input ->
                     input.copyTo(output)
                 }
-            } != null
+                true
+            } ?: false
+            if (!copied) {
+                context.contentResolver.delete(targetUri, null, null)
+            }
+            copied
         } catch (e: Exception) {
             context.contentResolver.delete(targetUri, null, null)
             false

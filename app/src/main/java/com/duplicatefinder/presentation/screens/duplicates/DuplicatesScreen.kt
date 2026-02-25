@@ -1,5 +1,9 @@
 package com.duplicatefinder.presentation.screens.duplicates
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,6 +63,19 @@ fun DuplicatesScreen(
     val uiState by viewModel.uiState.collectAsState()
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
+    val deletePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        viewModel.onDeleteConfirmationResult(result.resultCode == Activity.RESULT_OK)
+    }
+
+    uiState.pendingDeleteIntentSender?.let { intentSender ->
+        LaunchedEffect(intentSender) {
+            deletePermissionLauncher.launch(
+                IntentSenderRequest.Builder(intentSender).build()
+            )
+        }
+    }
 
     if (uiState.showFilterSheet) {
         FilterBottomSheet(

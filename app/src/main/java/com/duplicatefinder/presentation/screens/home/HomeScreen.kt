@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.History
@@ -83,7 +85,8 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(16.dp),
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (uiState.isLoading) {
@@ -215,28 +218,28 @@ fun HomeScreen(
                                         color = MaterialTheme.colorScheme.error
                                     )
                                 }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                Button(
+                                    onClick = onStartScan,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(56.dp),
+                                    enabled = uiState.selectedFolders.isNotEmpty()
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Search,
+                                        contentDescription = null
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = stringResource(R.string.home_start_scan),
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                }
                             }
                         }
-                    }
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    Button(
-                        onClick = onStartScan,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        enabled = uiState.selectedFolders.isNotEmpty()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(R.string.home_start_scan),
-                            style = MaterialTheme.typography.titleMedium
-                        )
                     }
 
                     if (uiState.duplicatesFound > 0) {
