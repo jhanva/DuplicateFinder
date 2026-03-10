@@ -26,6 +26,7 @@
     <string name="home_scan_folders_required">Select at least one folder to start scanning.</string>
     <string name="home_exact_only_title">Exact only</string>
     <string name="home_exact_only_subtitle">Faster scan, ignores similar matches</string>
+    <string name="home_review_quality">Review Image Quality</string>
 
     <!-- Scan Screen -->
     <string name="scan_title">Scanning</string>
@@ -42,6 +43,27 @@
     <string name="scan_select_all">Select All</string>
     <string name="scan_apply_folders">Use Selection</string>
     <string name="scan_select_folders_required">Select at least one folder to scan.</string>
+
+    <!-- Quality Review -->
+    <string name="quality_title">Quality Review</string>
+    <string name="quality_pause">Pause review</string>
+    <string name="quality_resume">Resume review</string>
+    <string name="quality_review_progress">Image %1$d of %2$d</string>
+    <string name="quality_score_label">Quality score: %1$d/100</string>
+    <string name="quality_metrics_label">Sharpness %1$d%% • Detail %2$d%% • Blockiness %3$d%%</string>
+    <string name="quality_keep">Keep</string>
+    <string name="quality_mark_for_trash">Mark for Trash</string>
+    <string name="quality_apply_batch">Apply Batch (%1$d)</string>
+    <string name="quality_apply_final_batch">Apply Pending Batch</string>
+    <string name="quality_paused_message">Review paused. Resume when ready or apply the pending batch.</string>
+    <string name="quality_review_complete_title">Quality Review Complete</string>
+    <string name="quality_summary_kept">Kept: %1$d</string>
+    <string name="quality_summary_moved">Moved to trash: %1$d</string>
+    <string name="quality_summary_pending">Pending in batch: %1$d</string>
+    <string name="quality_open_trash">Open Trash</string>
+    <string name="quality_no_results_title">No quality issues found</string>
+    <string name="quality_no_results_subtitle">All scanned images look acceptable with the current quality scoring.</string>
+    <string name="quality_select_folders_message">Choose at least one folder in Home and try again.</string>
 
     <!-- Duplicates Screen -->
     <string name="duplicates_title">Duplicates</string>

@@ -25,6 +25,7 @@ enum class ScanPhase {
     IDLE,
     LOADING,
     HASHING,
+    ANALYZING,
     COMPARING,
     COMPLETE,
     ERROR

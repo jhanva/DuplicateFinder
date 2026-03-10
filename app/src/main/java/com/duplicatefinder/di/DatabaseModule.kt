@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.duplicatefinder.data.local.db.AppDatabase
 import com.duplicatefinder.data.local.db.dao.ImageHashDao
+import com.duplicatefinder.data.local.db.dao.ImageQualityDao
 import com.duplicatefinder.data.local.db.dao.TrashDao
 import dagger.Module
 import dagger.Provides
@@ -25,13 +26,21 @@ object DatabaseModule {
             context,
             AppDatabase::class.java,
             AppDatabase.DATABASE_NAME
-        ).build()
+        )
+            .addMigrations(AppDatabase.MIGRATION_1_2)
+            .build()
     }
 
     @Provides
     @Singleton
     fun provideImageHashDao(database: AppDatabase): ImageHashDao {
         return database.imageHashDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideImageQualityDao(database: AppDatabase): ImageQualityDao {
+        return database.imageQualityDao()
     }
 
     @Provides

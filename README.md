@@ -6,6 +6,7 @@ Android application to detect and remove duplicate images from your device galle
 
 - **Exact Duplicate Detection** - Finds identical images using MD5 hash comparison
 - **Similar Image Detection** - Finds visually similar images using perceptual hashing (pHash)
+- **Quality Review** - Scores image quality (sharpness, detail density, blockiness) and lets you batch-send low-quality photos to trash
 - **Smart Grouping** - Groups duplicates with similarity scores
 - **Trash System** - Deleted images go to trash with 30-day recovery period
 - **Filters** - Filter by folder, date, size, and match type
@@ -95,6 +96,14 @@ app/src/main/java/com/duplicatefinder/
    - Generate 64-bit binary hash
 5. **Compare** - Use Hamming distance to find similar images (>90% threshold)
 6. **Group** - Create duplicate groups sorted by potential space savings
+
+### Quality Review Flow
+
+1. **Load selected folders** from Home
+2. **Analyze thumbnails** to extract sharpness, detail density, and blockiness
+3. **Score quality** from 0 to 100 using weighted metrics
+4. **Cache quality metrics** in Room to avoid recalculating unchanged images
+5. **Review and batch apply** decisions (Keep / Mark for Trash)
 
 ### Trash System
 
@@ -186,11 +195,18 @@ APK output:
 
 `app/build/outputs/apk/debug/app-debug.apk`
 
+Debug package name:
+
+`com.duplicatefinder.debug`
+
 ### Install on Device
 
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
+
+If you install by opening the APK directly on device, debug uses a separate package
+(`com.duplicatefinder.debug`) so it can coexist with production/release installs.
 
 ## Testing
 

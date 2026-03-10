@@ -1,9 +1,11 @@
 package com.duplicatefinder.di
 
 import com.duplicatefinder.data.repository.ImageRepositoryImpl
+import com.duplicatefinder.data.repository.QualityRepositoryImpl
 import com.duplicatefinder.data.repository.SettingsRepositoryImpl
 import com.duplicatefinder.data.repository.TrashRepositoryImpl
 import com.duplicatefinder.domain.repository.ImageRepository
+import com.duplicatefinder.domain.repository.QualityRepository
 import com.duplicatefinder.domain.repository.SettingsRepository
 import com.duplicatefinder.domain.repository.TrashRepository
 import dagger.Binds
@@ -27,6 +29,12 @@ abstract class RepositoryModule {
     abstract fun bindTrashRepository(
         impl: TrashRepositoryImpl
     ): TrashRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindQualityRepository(
+        impl: QualityRepositoryImpl
+    ): QualityRepository
 
     @Binds
     @Singleton

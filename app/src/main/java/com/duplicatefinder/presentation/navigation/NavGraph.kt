@@ -28,6 +28,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.duplicatefinder.presentation.screens.duplicates.DuplicatesScreen
 import com.duplicatefinder.presentation.screens.home.HomeScreen
+import com.duplicatefinder.presentation.screens.quality.QualityReviewScreen
 import com.duplicatefinder.presentation.screens.scan.ScanScreen
 import com.duplicatefinder.presentation.screens.settings.SettingsScreen
 import com.duplicatefinder.presentation.screens.trash.TrashScreen
@@ -71,6 +72,13 @@ sealed class Screen(
         title = "Settings",
         selectedIcon = Icons.Filled.Settings,
         unselectedIcon = Icons.Outlined.Settings
+    )
+
+    data object Quality : Screen(
+        route = "quality_review",
+        title = "Quality Review",
+        selectedIcon = Icons.Filled.PhotoLibrary,
+        unselectedIcon = Icons.Outlined.PhotoLibrary
     )
 }
 
@@ -135,6 +143,9 @@ fun DuplicateFinderNavHost(
                     },
                     onViewDuplicates = {
                         navController.navigate(Screen.Duplicates.route)
+                    },
+                    onReviewQuality = {
+                        navController.navigate(Screen.Quality.route)
                     }
                 )
             }
@@ -162,6 +173,23 @@ fun DuplicateFinderNavHost(
 
             composable(Screen.Settings.route) {
                 SettingsScreen()
+            }
+
+            composable(Screen.Quality.route) {
+                QualityReviewScreen(
+                    onBack = {
+                        navController.popBackStack()
+                    },
+                    onOpenTrash = {
+                        navController.navigate(Screen.Trash.route) {
+                            popUpTo(Screen.Home.route) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
             }
         }
     }

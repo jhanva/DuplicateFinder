@@ -55,6 +55,7 @@ import com.duplicatefinder.util.extension.toRelativeTimeString
 fun HomeScreen(
     onStartScan: () -> Unit,
     onViewDuplicates: () -> Unit,
+    onReviewQuality: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -274,6 +275,18 @@ fun HomeScreen(
                                     text = stringResource(R.string.home_start_scan),
                                     style = MaterialTheme.typography.titleMedium
                                 )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedButton(
+                                onClick = onReviewQuality,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                enabled = uiState.selectedFolders.isNotEmpty()
+                            ) {
+                                Text(stringResource(R.string.home_review_quality))
                             }
                         }
                     }
