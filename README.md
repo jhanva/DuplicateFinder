@@ -279,11 +279,14 @@ MIT License
 
 ## Contributing
 
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+This repository uses a strict branch-and-PR workflow.
+
+- Do all regular work from short-lived branches created from `develop`
+- Use Conventional Commits for both commits and PR titles
+- Send all work through Pull Requests
+- Merge to `main` only from `release/*` or `hotfix/*` branches
+
+The full repository workflow, versioning rules, and merge policy live in `AGENTS.md`.
 
 ## Author
 
