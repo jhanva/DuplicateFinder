@@ -48,6 +48,12 @@
     <string name="quality_title">Quality Review</string>
     <string name="quality_pause">Pause review</string>
     <string name="quality_resume">Resume review</string>
+    <string name="quality_filter_title">Review range</string>
+    <string name="quality_filter_description">Only images with score between %1$d and %2$d will appear in the queue.</string>
+    <string name="quality_filter_range_value">%1$d-%2$d/100</string>
+    <string name="quality_filter_showing">Showing %1$d of %2$d scanned images</string>
+    <string name="quality_filter_empty_title">No images match the current filter</string>
+    <string name="quality_filter_empty_subtitle">Adjust the score range to include more images in this review.</string>
     <string name="quality_review_progress">Image %1$d of %2$d</string>
     <string name="quality_score_label">Quality score: %1$d/100</string>
     <string name="quality_metrics_label">Sharpness %1$d%% • Detail %2$d%% • Blockiness %3$d%%</string>

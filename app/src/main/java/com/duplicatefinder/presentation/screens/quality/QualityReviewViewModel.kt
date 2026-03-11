@@ -44,6 +44,8 @@ class QualityReviewViewModel @Inject constructor(
                         error = null,
                         requiresFolderSelection = false,
                         qualityItems = emptyList(),
+                        reviewScoreMin = QualityReviewUiState.DEFAULT_REVIEW_SCORE_MIN,
+                        reviewScoreMax = QualityReviewUiState.DEFAULT_REVIEW_SCORE_MAX,
                         currentIndex = -1,
                         keptImageIds = emptySet(),
                         markedForTrashIds = emptySet(),
@@ -69,8 +71,13 @@ class QualityReviewViewModel @Inject constructor(
                 scanQualityImagesUseCase(selectedFolders).collect { scanState ->
                     _uiState.update { current ->
                         if (scanState.progress.phase == ScanPhase.COMPLETE) {
-                            val firstIndex = nextUndecidedIndex(
+                            val filteredItems = filterItemsByRange(
                                 items = scanState.items,
+                                minScore = current.reviewScoreMin,
+                                maxScore = current.reviewScoreMax
+                            )
+                            val firstIndex = nextUndecidedIndex(
+                                items = filteredItems,
                                 start = 0,
                                 kept = emptySet(),
                                 marked = emptySet(),
@@ -112,7 +119,7 @@ class QualityReviewViewModel @Inject constructor(
             it.copy(
                 keptImageIds = kept,
                 currentIndex = nextUndecidedIndex(
-                    items = it.qualityItems,
+                    items = it.filteredQualityItems,
                     start = (it.currentIndex + 1).coerceAtLeast(0),
                     kept = kept,
                     marked = it.markedForTrashIds,
@@ -132,11 +139,43 @@ class QualityReviewViewModel @Inject constructor(
             it.copy(
                 markedForTrashIds = marked,
                 currentIndex = nextUndecidedIndex(
-                    items = it.qualityItems,
+                    items = it.filteredQualityItems,
                     start = (it.currentIndex + 1).coerceAtLeast(0),
                     kept = it.keptImageIds,
                     marked = marked,
                     moved = it.movedToTrashIds
+                )
+            )
+        }
+    }
+
+    fun updateReviewScoreRange(minScore: Int, maxScore: Int) {
+        _uiState.update { state ->
+            val normalizedMin = minScore.coerceIn(
+                QualityReviewUiState.DEFAULT_REVIEW_SCORE_MIN,
+                QualityReviewUiState.DEFAULT_REVIEW_SCORE_MAX
+            )
+            val normalizedMax = maxScore.coerceIn(
+                QualityReviewUiState.DEFAULT_REVIEW_SCORE_MIN,
+                QualityReviewUiState.DEFAULT_REVIEW_SCORE_MAX
+            )
+            val rangeMin = minOf(normalizedMin, normalizedMax)
+            val rangeMax = maxOf(normalizedMin, normalizedMax)
+            val filteredItems = filterItemsByRange(
+                items = state.qualityItems,
+                minScore = rangeMin,
+                maxScore = rangeMax
+            )
+            val currentId = state.currentItem?.image?.id
+            state.copy(
+                reviewScoreMin = rangeMin,
+                reviewScoreMax = rangeMax,
+                currentIndex = resolveCurrentIndex(
+                    items = filteredItems,
+                    currentId = currentId,
+                    kept = state.keptImageIds,
+                    marked = state.markedForTrashIds,
+                    moved = state.movedToTrashIds
                 )
             )
         }
@@ -259,12 +298,32 @@ class QualityReviewViewModel @Inject constructor(
             markedForTrashIds = marked,
             movedToTrashIds = movedSet,
             currentIndex = nextUndecidedIndex(
-                items = qualityItems,
-                start = if (currentItem == null) qualityItems.size else currentIndex,
+                items = filteredQualityItems,
+                start = if (currentItem == null) filteredQualityItems.size else currentIndex,
                 kept = keptImageIds,
                 marked = marked,
                 moved = movedSet
             )
+        )
+    }
+
+    private fun resolveCurrentIndex(
+        items: List<ImageQualityItem>,
+        currentId: Long?,
+        kept: Set<Long>,
+        marked: Set<Long>,
+        moved: Set<Long>
+    ): Int {
+        if (currentId != null && currentId !in kept && currentId !in marked && currentId !in moved) {
+            val currentIndex = items.indexOfFirst { it.image.id == currentId }
+            if (currentIndex >= 0) return currentIndex
+        }
+        return nextUndecidedIndex(
+            items = items,
+            start = 0,
+            kept = kept,
+            marked = marked,
+            moved = moved
         )
     }
 
@@ -282,6 +341,16 @@ class QualityReviewViewModel @Inject constructor(
             }
         }
         return -1
+    }
+
+    private fun filterItemsByRange(
+        items: List<ImageQualityItem>,
+        minScore: Int,
+        maxScore: Int
+    ): List<ImageQualityItem> {
+        val min = minScore.toFloat()
+        val max = maxScore.toFloat()
+        return items.filter { it.qualityScore in min..max }
     }
 
     override fun onCleared() {

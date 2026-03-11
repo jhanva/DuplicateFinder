@@ -23,12 +23,16 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RestoreFromTrash
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -52,6 +56,7 @@ import com.duplicatefinder.R
 import com.duplicatefinder.domain.model.ImageQualityItem
 import com.duplicatefinder.presentation.components.ScanProgressIndicator
 import com.duplicatefinder.util.extension.formatFileSize
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -100,7 +105,7 @@ fun QualityReviewScreen(
                     }
                 },
                 actions = {
-                    if (!uiState.isScanning && uiState.hasItems && !uiState.isReviewComplete) {
+                    if (!uiState.isScanning && uiState.hasFilterMatches && !uiState.isReviewComplete) {
                         IconButton(
                             onClick = {
                                 if (uiState.isPaused) {
@@ -165,30 +170,200 @@ fun QualityReviewScreen(
                     )
                 }
 
-                uiState.isReviewComplete -> {
-                    ReviewSummary(
+                else -> {
+                    LoadedReviewState(
                         state = uiState,
+                        onRangeChange = viewModel::updateReviewScoreRange,
+                        onKeep = { viewModel.keepCurrent() },
+                        onMarkForTrash = { viewModel.markCurrentForTrash() },
                         onApplyBatch = { viewModel.applyBatchToTrash() },
+                        onOpenTrash = onOpenTrash,
+                        onBack = onBack
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadedReviewState(
+    state: QualityReviewUiState,
+    onRangeChange: (Int, Int) -> Unit,
+    onKeep: () -> Unit,
+    onMarkForTrash: () -> Unit,
+    onApplyBatch: () -> Unit,
+    onOpenTrash: () -> Unit,
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        ReviewFilterCard(
+            reviewScoreMin = state.reviewScoreMin,
+            reviewScoreMax = state.reviewScoreMax,
+            matchingCount = state.totalCount,
+            totalCount = state.qualityItems.size,
+            onRangeChange = onRangeChange
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            when {
+                state.hasNoFilterMatches -> {
+                    NoFilterMatchesContent(
+                        pendingBatchCount = state.pendingBatchCount,
+                        onApplyBatch = onApplyBatch,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+
+                state.isReviewComplete -> {
+                    ReviewSummary(
+                        state = state,
+                        onApplyBatch = onApplyBatch,
                         onOpenTrash = onOpenTrash,
                         onBack = onBack
                     )
                 }
 
                 else -> {
-                    uiState.currentItem?.let { item ->
+                    state.currentItem?.let { item ->
                         ReviewContent(
                             item = item,
-                            reviewedCount = uiState.reviewedCount,
-                            totalCount = uiState.totalCount,
-                            pendingBatchCount = uiState.pendingBatchCount,
-                            isPaused = uiState.isPaused,
-                            onKeep = { viewModel.keepCurrent() },
-                            onMarkForTrash = { viewModel.markCurrentForTrash() },
-                            onApplyBatch = { viewModel.applyBatchToTrash() }
+                            reviewedCount = state.reviewedCount,
+                            totalCount = state.totalCount,
+                            pendingBatchCount = state.pendingBatchCount,
+                            isPaused = state.isPaused,
+                            onKeep = onKeep,
+                            onMarkForTrash = onMarkForTrash,
+                            onApplyBatch = onApplyBatch
                         )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun NoFilterMatchesContent(
+    pendingBatchCount: Int,
+    onApplyBatch: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        EmptyState(
+            title = stringResource(R.string.quality_filter_empty_title),
+            subtitle = stringResource(R.string.quality_filter_empty_subtitle)
+        )
+
+        if (pendingBatchCount > 0) {
+            Spacer(modifier = Modifier.height(16.dp))
+            OutlinedButton(
+                onClick = onApplyBatch,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = Icons.Default.RestoreFromTrash,
+                    contentDescription = null
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(R.string.quality_apply_batch, pendingBatchCount))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReviewFilterCard(
+    reviewScoreMin: Int,
+    reviewScoreMax: Int,
+    matchingCount: Int,
+    totalCount: Int,
+    onRangeChange: (Int, Int) -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = stringResource(R.string.quality_filter_title),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = stringResource(
+                            R.string.quality_filter_description,
+                            reviewScoreMin,
+                            reviewScoreMax
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Text(
+                    text = stringResource(
+                        R.string.quality_filter_range_value,
+                        reviewScoreMin,
+                        reviewScoreMax
+                    ),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            RangeSlider(
+                value = reviewScoreMin.toFloat()..reviewScoreMax.toFloat(),
+                onValueChange = { range ->
+                    onRangeChange(
+                        range.start.roundToInt(),
+                        range.endInclusive.roundToInt()
+                    )
+                },
+                valueRange = 0f..100f,
+                steps = 99
+            )
+
+            HorizontalDivider()
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = stringResource(
+                    R.string.quality_filter_showing,
+                    matchingCount,
+                    totalCount
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
