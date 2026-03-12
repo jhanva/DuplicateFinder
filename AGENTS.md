@@ -19,7 +19,7 @@ This repository follows a strict GitFlow-style process.
 - Never push directly to `main`.
 - Never push directly to `develop`.
 - Every change must arrive through a Pull Request.
-- `main` only accepts PRs from `release/*` or `hotfix/*`.
+- `main` only accepts PRs whose head branch is exactly `develop`.
 - `develop` accepts PRs from short-lived work branches and from back-merges after a release or hotfix.
 - Force-pushes and branch deletion must be disabled on `main` and `develop`.
 - PRs into `main` or `develop` must require at least one approval, resolved conversations, and passing checks.
@@ -46,9 +46,10 @@ Use lowercase kebab-case names.
 - PR titles must follow Conventional Commits.
 - A PR must target the correct base branch:
   - `feature/*`, `fix/*`, `refactor/*`, `docs/*`, `test/*`, `chore/*` -> `develop`
-  - `release/*` -> `main`
-  - `hotfix/*` -> `main`
-  - Post-release or post-hotfix sync PR -> `develop`
+  - `release/*` -> `develop`
+  - `hotfix/*` -> `develop`
+  - `develop` -> `main`
+  - Post-release or post-hotfix sync PR -> `develop` only when explicitly needed to reconcile history
 - Do not merge with unresolved review comments.
 - Do not merge if required checks fail.
 - Do not merge if the branch is behind its base branch and needs to be updated.
@@ -154,20 +155,22 @@ This project uses Semantic Versioning for `versionName` and a monotonically incr
    - documentation updates
    - version bump and release notes
 3. Update `app/build.gradle.kts` with the target `versionName` and the next `versionCode`.
-4. Open a PR from `release/x.y.z` to `main`.
+4. Open a PR from `release/x.y.z` to `develop`.
 5. Merge with `squash merge` after approval and passing checks.
-6. Create the Git tag `vX.Y.Z` on `main`.
-7. Open a follow-up PR from `main` back into `develop` so release-only changes remain synced.
+6. Open a PR from `develop` to `main`.
+7. Merge the `develop` -> `main` PR after approval and passing checks.
+8. Create the Git tag `vX.Y.Z` on `main`.
 
 ### Hotfix Release
 
 1. Branch `hotfix/x.y.z` from `main`.
 2. Apply the minimum safe fix.
 3. Update `app/build.gradle.kts` with the new patch `versionName` and the next `versionCode`.
-4. Open a PR from `hotfix/x.y.z` to `main`.
+4. Open a PR from `hotfix/x.y.z` to `develop`.
 5. Merge with `squash merge` after approval and passing checks.
-6. Create the Git tag `vX.Y.Z` on `main`.
-7. Open a follow-up PR from `main` back into `develop`.
+6. Open a PR from `develop` to `main`.
+7. Merge the `develop` -> `main` PR after approval and passing checks.
+8. Create the Git tag `vX.Y.Z` on `main`.
 
 ## Daily Workflow
 
@@ -183,23 +186,24 @@ This project uses Semantic Versioning for `versionName` and a monotonically incr
 
 1. Freeze `develop` into `release/x.y.z`.
 2. Stabilize the branch.
-3. Merge to `main` by PR only.
-4. Tag the release.
-5. Back-merge `main` into `develop` by PR.
+3. Merge the release branch back into `develop` by PR.
+4. Promote `develop` to `main` by PR only.
+5. Tag the release.
 
 ### Emergency Fix
 
 1. Branch from `main` into `hotfix/x.y.z`.
 2. Fix only the urgent issue.
-3. Merge to `main` by PR only.
-4. Tag the release.
-5. Back-merge to `develop` by PR.
+3. Merge the hotfix branch into `develop` by PR.
+4. Promote `develop` to `main` by PR only.
+5. Tag the release.
 
 ## Non-Negotiable Rules For Agents
 
 - Do not commit directly on `main`.
 - Do not commit directly on `develop`.
 - Do not merge to `main` without a PR.
+- Do not open or merge a PR to `main` from any branch other than `develop`.
 - Do not bypass approvals or required checks.
 - Do not expose development suffixes in any user-visible version label, including the About screen.
 - Do not change `versionName` or `versionCode` outside release or hotfix work unless the user explicitly requests it.
