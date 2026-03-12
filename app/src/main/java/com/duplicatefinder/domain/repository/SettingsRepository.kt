@@ -10,6 +10,8 @@ interface SettingsRepository {
     val excludedFolders: Flow<Set<String>>
     val scanFolders: Flow<Set<String>>
     val lastScanTimestamp: Flow<Long>
+    val lastDuplicateCount: Flow<Int>
+    val lastPotentialSavings: Flow<Long>
     val scanMode: Flow<ScanMode>
 
     suspend fun setSimilarityThreshold(threshold: Float)
@@ -18,5 +20,6 @@ interface SettingsRepository {
     suspend fun setExcludedFolders(folders: Set<String>)
     suspend fun setScanFolders(folders: Set<String>)
     suspend fun setLastScanTimestamp(timestamp: Long)
+    suspend fun setLastScanSummary(timestamp: Long, duplicateCount: Int, potentialSavings: Long)
     suspend fun setScanMode(mode: ScanMode)
 }

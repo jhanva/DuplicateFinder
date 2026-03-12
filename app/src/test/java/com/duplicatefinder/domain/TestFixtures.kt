@@ -84,6 +84,8 @@ class FakeSettingsRepository(
     override val excludedFolders: Flow<Set<String>> = MutableStateFlow(emptySet())
     override val scanFolders: Flow<Set<String>> = MutableStateFlow(emptySet())
     override val lastScanTimestamp: Flow<Long> = MutableStateFlow(0L)
+    override val lastDuplicateCount: Flow<Int> = MutableStateFlow(0)
+    override val lastPotentialSavings: Flow<Long> = MutableStateFlow(0L)
     override val scanMode: Flow<ScanMode> = MutableStateFlow(ScanMode.EXACT_AND_SIMILAR)
 
     override suspend fun setSimilarityThreshold(threshold: Float) = Unit
@@ -97,6 +99,12 @@ class FakeSettingsRepository(
     override suspend fun setScanFolders(folders: Set<String>) = Unit
 
     override suspend fun setLastScanTimestamp(timestamp: Long) = Unit
+
+    override suspend fun setLastScanSummary(
+        timestamp: Long,
+        duplicateCount: Int,
+        potentialSavings: Long
+    ) = Unit
 
     override suspend fun setScanMode(mode: ScanMode) = Unit
 }

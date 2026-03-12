@@ -270,7 +270,7 @@ class TrashRepositoryImpl @Inject constructor(
 
     private fun restoreWithMediaStore(item: TrashItem, trashFile: File): Boolean {
         val relativePath = extractRelativePath(item.originalPath)
-        val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val collection = MediaStore.Images.Media.getContentUri(resolveVolumeName(item.originalUri))
         val contentValues = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, item.name)
             put(MediaStore.Images.Media.MIME_TYPE, item.mimeType)
@@ -313,10 +313,34 @@ class TrashRepositoryImpl @Inject constructor(
     private fun extractRelativePath(originalPath: String): String? {
         if (originalPath.isBlank()) return null
 
-        val normalized = originalPath.replace('\\', '/')
-        val withoutStoragePrefix = normalized.substringAfter("/storage/emulated/0/", normalized)
-        val parent = withoutStoragePrefix.substringBeforeLast('/', "")
+        val normalized = originalPath.replace('\\', '/').trim()
+        val relativePath = when {
+            normalized.startsWith("/storage/emulated/0/") ->
+                normalized.removePrefix("/storage/emulated/0/")
+            normalized.startsWith("storage/emulated/0/") ->
+                normalized.removePrefix("storage/emulated/0/")
+            normalized.startsWith("/storage/self/primary/") ->
+                normalized.removePrefix("/storage/self/primary/")
+            normalized.startsWith("storage/self/primary/") ->
+                normalized.removePrefix("storage/self/primary/")
+            normalized.startsWith("/storage/") ->
+                normalized.removePrefix("/storage/").substringAfter('/', "")
+            normalized.startsWith("storage/") ->
+                normalized.removePrefix("storage/").substringAfter('/', "")
+            normalized.startsWith("/sdcard/") ->
+                normalized.removePrefix("/sdcard/")
+            normalized.startsWith("sdcard/") ->
+                normalized.removePrefix("sdcard/")
+            else -> normalized.trimStart('/')
+        }
+        val parent = relativePath.substringBeforeLast('/', "")
         return if (parent.isBlank()) null else "$parent/"
+    }
+
+    private fun resolveVolumeName(originalUri: Uri): String {
+        return originalUri.pathSegments.firstOrNull()
+            ?.takeIf { it.isNotBlank() }
+            ?: MediaStore.VOLUME_EXTERNAL_PRIMARY
     }
 
     private fun TrashEntity.toDomainModel() = TrashItem(

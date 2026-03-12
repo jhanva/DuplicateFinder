@@ -57,19 +57,28 @@ class ScanViewModel @Inject constructor(
                 scanImagesUseCase(scanMode, selectedFolders).collect { (progress, images) ->
                     _uiState.update { it.copy(scanProgress = progress) }
 
-                    if (progress.phase == ScanPhase.COMPLETE && images.isNotEmpty()) {
+                    if (progress.phase == ScanPhase.COMPLETE) {
                         _uiState.update {
                             it.copy(
                                 scanProgress = ScanProgress(ScanPhase.COMPARING, 0, images.size)
                             )
                         }
 
-                        val duplicateGroups = findDuplicatesUseCase(images, scanMode)
+                        val duplicateGroups = if (images.isEmpty()) {
+                            emptyList()
+                        } else {
+                            findDuplicatesUseCase(images, scanMode)
+                        }
 
                         val totalDuplicates = duplicateGroups.sumOf { it.imageCount - 1 }
                         val potentialSavings = duplicateGroups.sumOf { it.potentialSavings }
+                        val timestamp = System.currentTimeMillis() / 1000
 
-                        settingsRepository.setLastScanTimestamp(System.currentTimeMillis() / 1000)
+                        settingsRepository.setLastScanSummary(
+                            timestamp = timestamp,
+                            duplicateCount = totalDuplicates,
+                            potentialSavings = potentialSavings
+                        )
 
                         _uiState.update {
                             it.copy(

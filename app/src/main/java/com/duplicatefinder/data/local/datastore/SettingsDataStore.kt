@@ -31,6 +31,8 @@ class SettingsDataStore @Inject constructor(
         val EXCLUDED_FOLDERS = stringSetPreferencesKey("excluded_folders")
         val SCAN_FOLDERS = stringSetPreferencesKey("scan_folders")
         val LAST_SCAN_TIMESTAMP = longPreferencesKey("last_scan_timestamp")
+        val LAST_DUPLICATE_COUNT = intPreferencesKey("last_duplicate_count")
+        val LAST_POTENTIAL_SAVINGS = longPreferencesKey("last_potential_savings")
         val SCAN_MODE = stringPreferencesKey("scan_mode")
     }
 
@@ -56,6 +58,14 @@ class SettingsDataStore @Inject constructor(
 
     val lastScanTimestamp: Flow<Long> = context.dataStore.data.map { preferences ->
         preferences[Keys.LAST_SCAN_TIMESTAMP] ?: 0L
+    }
+
+    val lastDuplicateCount: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[Keys.LAST_DUPLICATE_COUNT] ?: 0
+    }
+
+    val lastPotentialSavings: Flow<Long> = context.dataStore.data.map { preferences ->
+        preferences[Keys.LAST_POTENTIAL_SAVINGS] ?: 0L
     }
 
     val scanMode: Flow<ScanMode> = context.dataStore.data.map { preferences ->
@@ -99,6 +109,18 @@ class SettingsDataStore @Inject constructor(
     suspend fun setLastScanTimestamp(timestamp: Long) {
         context.dataStore.edit { preferences ->
             preferences[Keys.LAST_SCAN_TIMESTAMP] = timestamp
+        }
+    }
+
+    suspend fun setLastScanSummary(
+        timestamp: Long,
+        duplicateCount: Int,
+        potentialSavings: Long
+    ) {
+        context.dataStore.edit { preferences ->
+            preferences[Keys.LAST_SCAN_TIMESTAMP] = timestamp
+            preferences[Keys.LAST_DUPLICATE_COUNT] = duplicateCount.coerceAtLeast(0)
+            preferences[Keys.LAST_POTENTIAL_SAVINGS] = potentialSavings.coerceAtLeast(0L)
         }
     }
 

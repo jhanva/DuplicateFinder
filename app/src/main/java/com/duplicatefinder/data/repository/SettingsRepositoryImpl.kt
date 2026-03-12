@@ -30,6 +30,12 @@ class SettingsRepositoryImpl @Inject constructor(
     override val lastScanTimestamp: Flow<Long>
         get() = settingsDataStore.lastScanTimestamp
 
+    override val lastDuplicateCount: Flow<Int>
+        get() = settingsDataStore.lastDuplicateCount
+
+    override val lastPotentialSavings: Flow<Long>
+        get() = settingsDataStore.lastPotentialSavings
+
     override val scanMode: Flow<ScanMode>
         get() = settingsDataStore.scanMode
 
@@ -55,6 +61,14 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun setLastScanTimestamp(timestamp: Long) {
         settingsDataStore.setLastScanTimestamp(timestamp)
+    }
+
+    override suspend fun setLastScanSummary(
+        timestamp: Long,
+        duplicateCount: Int,
+        potentialSavings: Long
+    ) {
+        settingsDataStore.setLastScanSummary(timestamp, duplicateCount, potentialSavings)
     }
 
     override suspend fun setScanMode(mode: ScanMode) {

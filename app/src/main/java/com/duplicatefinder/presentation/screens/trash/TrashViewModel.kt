@@ -2,6 +2,7 @@ package com.duplicatefinder.presentation.screens.trash
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.duplicatefinder.domain.repository.SettingsRepository
 import com.duplicatefinder.domain.repository.TrashRepository
 import com.duplicatefinder.domain.usecase.EmptyTrashUseCase
 import com.duplicatefinder.domain.usecase.RestoreFromTrashUseCase
@@ -9,6 +10,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -16,6 +18,7 @@ import javax.inject.Inject
 @HiltViewModel
 class TrashViewModel @Inject constructor(
     private val trashRepository: TrashRepository,
+    private val settingsRepository: SettingsRepository,
     private val restoreFromTrashUseCase: RestoreFromTrashUseCase,
     private val emptyTrashUseCase: EmptyTrashUseCase
 ) : ViewModel() {
@@ -24,7 +27,16 @@ class TrashViewModel @Inject constructor(
     val uiState: StateFlow<TrashUiState> = _uiState.asStateFlow()
 
     init {
+        observeSettings()
         loadTrashItems()
+    }
+
+    private fun observeSettings() {
+        viewModelScope.launch {
+            settingsRepository.autoDeleteDays.collect { autoDeleteDays ->
+                _uiState.update { it.copy(autoDeleteDays = autoDeleteDays) }
+            }
+        }
     }
 
     private fun loadTrashItems() {
@@ -33,12 +45,14 @@ class TrashViewModel @Inject constructor(
 
             trashRepository.getTrashItems().collect { items ->
                 val totalSize = trashRepository.getTrashSize()
+                val validSelectedItems = _uiState.value.selectedItems.intersect(items.map { it.id }.toSet())
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         trashItems = items,
+                        selectedItems = validSelectedItems,
                         totalSize = totalSize,
-                        error = null
+                        error = it.error
                     )
                 }
             }
@@ -95,26 +109,17 @@ class TrashViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isProcessing = true, showDeleteDialog = false) }
 
-            try {
-                val selectedIds = _uiState.value.selectedItems.toList()
-                val itemsToDelete = _uiState.value.trashItems.filter { it.id in selectedIds }
+            val selectedIds = _uiState.value.selectedItems.toList()
+            val itemsToDelete = _uiState.value.trashItems.filter { it.id in selectedIds }
+            val result = trashRepository.deletePermanently(itemsToDelete)
 
-                trashRepository.deletePermanently(itemsToDelete)
-
-                _uiState.update {
-                    it.copy(
-                        isProcessing = false,
-                        selectedItems = emptySet()
-                    )
+            handleActionResult(
+                result = result,
+                requestedCount = itemsToDelete.size,
+                partialFailureMessage = { deletedCount, requestedCount ->
+                    "Only $deletedCount of $requestedCount items were deleted permanently."
                 }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isProcessing = false,
-                        error = e.message
-                    )
-                }
-            }
+            )
         }
     }
 
@@ -122,26 +127,17 @@ class TrashViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isProcessing = true, showRestoreDialog = false) }
 
-            try {
-                val selectedIds = _uiState.value.selectedItems.toList()
-                val itemsToRestore = _uiState.value.trashItems.filter { it.id in selectedIds }
+            val selectedIds = _uiState.value.selectedItems.toList()
+            val itemsToRestore = _uiState.value.trashItems.filter { it.id in selectedIds }
+            val result = restoreFromTrashUseCase(itemsToRestore)
 
-                restoreFromTrashUseCase(itemsToRestore)
-
-                _uiState.update {
-                    it.copy(
-                        isProcessing = false,
-                        selectedItems = emptySet()
-                    )
+            handleActionResult(
+                result = result,
+                requestedCount = itemsToRestore.size,
+                partialFailureMessage = { restoredCount, requestedCount ->
+                    "Only $restoredCount of $requestedCount items were restored."
                 }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isProcessing = false,
-                        error = e.message
-                    )
-                }
-            }
+            )
         }
     }
 
@@ -149,23 +145,49 @@ class TrashViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isProcessing = true, showEmptyTrashDialog = false) }
 
-            try {
-                emptyTrashUseCase()
+            val requestedCount = _uiState.value.trashItems.size
+            val result = emptyTrashUseCase()
 
-                _uiState.update {
-                    it.copy(
-                        isProcessing = false,
-                        selectedItems = emptySet()
-                    )
+            handleActionResult(
+                result = result,
+                requestedCount = requestedCount,
+                partialFailureMessage = { deletedCount, totalCount ->
+                    "Only $deletedCount of $totalCount trash items were deleted."
                 }
-            } catch (e: Exception) {
+            )
+        }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(error = null) }
+    }
+
+    private fun handleActionResult(
+        result: Result<Int>,
+        requestedCount: Int,
+        partialFailureMessage: (processedCount: Int, requestedCount: Int) -> String
+    ) {
+        result
+            .onSuccess { processedCount ->
                 _uiState.update {
                     it.copy(
                         isProcessing = false,
-                        error = e.message
+                        selectedItems = emptySet(),
+                        error = if (processedCount < requestedCount) {
+                            partialFailureMessage(processedCount, requestedCount)
+                        } else {
+                            null
+                        }
                     )
                 }
             }
-        }
+            .onFailure { error ->
+                _uiState.update {
+                    it.copy(
+                        isProcessing = false,
+                        error = error.message ?: "Trash operation failed."
+                    )
+                }
+            }
     }
 }

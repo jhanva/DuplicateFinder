@@ -92,7 +92,7 @@
     <string name="trash_restore">Restore</string>
     <string name="trash_delete_permanently">Delete Permanently</string>
     <string name="trash_empty_trash">Empty Trash</string>
-    <string name="trash_auto_delete">Items will be deleted after 30 days</string>
+    <string name="trash_auto_delete">Items will be deleted after %1$d days</string>
     <string name="trash_deleted_on">Deleted on %1$s</string>
 
     <!-- Settings Screen -->
@@ -116,7 +116,7 @@
 
     <!-- Dialogs -->
     <string name="dialog_delete_title">Move to Trash?</string>
-    <string name="dialog_delete_message">%1$d images will be moved to trash. You can restore them within 30 days.</string>
+    <string name="dialog_delete_message">%1$d images will be moved to trash. You can restore them before they are auto-deleted.</string>
     <string name="dialog_delete_confirm">Move to Trash</string>
     <string name="dialog_delete_permanent_title">Delete Permanently?</string>
     <string name="dialog_delete_permanent_message">%1$d images will be permanently deleted. This action cannot be undone.</string>
