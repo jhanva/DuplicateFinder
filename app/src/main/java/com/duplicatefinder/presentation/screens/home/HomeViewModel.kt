@@ -29,6 +29,8 @@ class HomeViewModel @Inject constructor(
 
             try {
                 val lastScan = settingsRepository.lastScanTimestamp.first()
+                val lastDuplicateCount = settingsRepository.lastDuplicateCount.first()
+                val lastPotentialSavings = settingsRepository.lastPotentialSavings.first()
                 val scanMode = settingsRepository.scanMode.first()
                 val folders = imageRepository.getFolders()
                 val selectedFolders = settingsRepository.scanFolders.first()
@@ -50,6 +52,8 @@ class HomeViewModel @Inject constructor(
                     it.copy(
                         isLoading = false,
                         totalImages = imageCount,
+                        duplicatesFound = lastDuplicateCount,
+                        spaceRecoverable = lastPotentialSavings,
                         lastScanTimestamp = lastScan,
                         availableFolders = folders,
                         selectedFolders = validSelection,
@@ -105,12 +109,20 @@ class HomeViewModel @Inject constructor(
     }
 
     fun updateScanResults(duplicatesFound: Int, spaceRecoverable: Long) {
-        _uiState.update {
-            it.copy(
-                duplicatesFound = duplicatesFound,
-                spaceRecoverable = spaceRecoverable,
-                lastScanTimestamp = System.currentTimeMillis() / 1000
+        val timestamp = System.currentTimeMillis() / 1000
+        viewModelScope.launch {
+            settingsRepository.setLastScanSummary(
+                timestamp = timestamp,
+                duplicateCount = duplicatesFound,
+                potentialSavings = spaceRecoverable
             )
+            _uiState.update {
+                it.copy(
+                    duplicatesFound = duplicatesFound,
+                    spaceRecoverable = spaceRecoverable,
+                    lastScanTimestamp = timestamp
+                )
+            }
         }
     }
 }

@@ -139,7 +139,7 @@ fun HomeScreen(
 
                         StatCard(
                             icon = Icons.Default.CloudQueue,
-                            value = if (uiState.duplicatesFound > 0)
+                            value = if (uiState.hasScannedBefore)
                                 uiState.duplicatesFound.toString() else "-",
                             label = stringResource(R.string.home_duplicates_found),
                             modifier = Modifier.weight(1f)
@@ -154,7 +154,7 @@ fun HomeScreen(
                     ) {
                         StatCard(
                             icon = Icons.Default.CloudQueue,
-                            value = if (uiState.spaceRecoverable > 0)
+                            value = if (uiState.hasScannedBefore)
                                 uiState.spaceRecoverable.formatFileSize() else "-",
                             label = stringResource(R.string.home_space_recoverable),
                             modifier = Modifier.weight(1f)

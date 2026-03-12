@@ -7,6 +7,7 @@ data class TrashUiState(
     val trashItems: List<TrashItem> = emptyList(),
     val selectedItems: Set<Long> = emptySet(),
     val totalSize: Long = 0,
+    val autoDeleteDays: Int = 30,
     val showDeleteDialog: Boolean = false,
     val showRestoreDialog: Boolean = false,
     val showEmptyTrashDialog: Boolean = false,

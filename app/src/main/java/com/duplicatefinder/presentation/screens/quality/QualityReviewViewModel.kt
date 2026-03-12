@@ -170,7 +170,7 @@ class QualityReviewViewModel @Inject constructor(
             state.copy(
                 reviewScoreMin = rangeMin,
                 reviewScoreMax = rangeMax,
-                currentIndex = resolveCurrentIndex(
+                currentIndex = resolveCurrentIndexAfterRangeChange(
                     items = filteredItems,
                     currentId = currentId,
                     kept = state.keptImageIds,
@@ -307,26 +307,6 @@ class QualityReviewViewModel @Inject constructor(
         )
     }
 
-    private fun resolveCurrentIndex(
-        items: List<ImageQualityItem>,
-        currentId: Long?,
-        kept: Set<Long>,
-        marked: Set<Long>,
-        moved: Set<Long>
-    ): Int {
-        if (currentId != null && currentId !in kept && currentId !in marked && currentId !in moved) {
-            val currentIndex = items.indexOfFirst { it.image.id == currentId }
-            if (currentIndex >= 0) return currentIndex
-        }
-        return nextUndecidedIndex(
-            items = items,
-            start = 0,
-            kept = kept,
-            marked = marked,
-            moved = moved
-        )
-    }
-
     private fun nextUndecidedIndex(
         items: List<ImageQualityItem>,
         start: Int,
@@ -357,4 +337,51 @@ class QualityReviewViewModel @Inject constructor(
         super.onCleared()
         scanJob?.cancel()
     }
+}
+
+internal fun resolveCurrentIndexAfterRangeChange(
+    items: List<ImageQualityItem>,
+    currentId: Long?,
+    kept: Set<Long>,
+    marked: Set<Long>,
+    moved: Set<Long>
+): Int {
+    val firstUndecided = nextUndecidedIndexForRangeChange(
+        items = items,
+        start = 0,
+        kept = kept,
+        marked = marked,
+        moved = moved
+    )
+
+    if (currentId == null || currentId in kept || currentId in marked || currentId in moved) {
+        return firstUndecided
+    }
+
+    val currentIndex = items.indexOfFirst { it.image.id == currentId }
+    if (currentIndex < 0) {
+        return firstUndecided
+    }
+
+    return if (firstUndecided in 0 until currentIndex) {
+        firstUndecided
+    } else {
+        currentIndex
+    }
+}
+
+private fun nextUndecidedIndexForRangeChange(
+    items: List<ImageQualityItem>,
+    start: Int,
+    kept: Set<Long>,
+    marked: Set<Long>,
+    moved: Set<Long>
+): Int {
+    for (index in start until items.size) {
+        val id = items[index].image.id
+        if (id !in kept && id !in marked && id !in moved) {
+            return index
+        }
+    }
+    return -1
 }

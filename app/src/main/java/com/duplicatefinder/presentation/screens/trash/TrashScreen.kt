@@ -36,12 +36,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,7 +61,6 @@ import com.duplicatefinder.domain.model.TrashItem
 import com.duplicatefinder.presentation.components.ConfirmDeleteDialog
 import com.duplicatefinder.presentation.components.ConfirmRestoreDialog
 import com.duplicatefinder.util.extension.formatFileSize
-import com.duplicatefinder.util.extension.formatDate
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,6 +69,14 @@ fun TrashScreen(
     viewModel: TrashViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    uiState.error?.let { message ->
+        LaunchedEffect(message) {
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearError()
+        }
+    }
 
     if (uiState.showDeleteDialog) {
         ConfirmDeleteDialog(
@@ -125,6 +136,7 @@ fun TrashScreen(
                 }
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             if (uiState.hasSelection) {
                 BottomAppBar {
@@ -205,7 +217,7 @@ fun TrashScreen(
                         }
 
                         Text(
-                            text = stringResource(R.string.trash_auto_delete),
+                            text = stringResource(R.string.trash_auto_delete, uiState.autoDeleteDays),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 16.dp)
