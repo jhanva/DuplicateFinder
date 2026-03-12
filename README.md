@@ -279,12 +279,12 @@ MIT License
 
 ## Contributing
 
-This repository uses a strict branch-and-PR workflow.
+This repository uses a direct-to-`main` workflow.
 
-- Do all regular work from short-lived branches created from `develop`
-- Use Conventional Commits for both commits and PR titles
-- Send all work through Pull Requests
-- Merge to `main` only from `release/*` or `hotfix/*` branches
+- Keep `main` releasable
+- Use Conventional Commits for commits and optional PR titles
+- Run the relevant checks before pushing
+- Bump `versionName` and `versionCode` only for release/versioning work
 
 The full repository workflow, versioning rules, and merge policy live in `AGENTS.md`.
 
