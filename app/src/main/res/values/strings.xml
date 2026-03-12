@@ -110,6 +110,9 @@
     <string name="settings_dark_mode">Dark Mode</string>
     <string name="settings_about">About</string>
     <string name="settings_version">Version %1$s</string>
+    <string name="settings_about_version_label">Version</string>
+    <string name="settings_about_author_label">Author</string>
+    <string name="settings_about_author_name">jhanva</string>
 
     <!-- Dialogs -->
     <string name="dialog_delete_title">Move to Trash?</string>

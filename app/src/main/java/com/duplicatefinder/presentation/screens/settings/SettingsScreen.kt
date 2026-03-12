@@ -119,13 +119,13 @@ fun SettingsScreen(
 
             SettingsSection(title = stringResource(R.string.settings_about)) {
                 SettingsTextItem(
-                    title = "Version",
+                    title = stringResource(R.string.settings_about_version_label),
                     value = BuildConfig.VERSION_NAME
                 )
 
                 SettingsTextItem(
-                    title = "Developer",
-                    value = "DuplicateFinder Team"
+                    title = stringResource(R.string.settings_about_author_label),
+                    value = stringResource(R.string.settings_about_author_name)
                 )
             }
 
