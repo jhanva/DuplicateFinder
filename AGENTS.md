@@ -120,6 +120,9 @@ This project uses Semantic Versioning for `versionName` and a monotonically incr
 
 - `versionName` must always use the full `MAJOR.MINOR.PATCH` format.
 - Example: `1.0.0`, not `1.0`.
+- User-facing versions must stay clean and release-like.
+- Do not append `-debug`, `-dev`, `-test`, or similar suffixes to the user-visible `versionName`.
+- Debug or internal differentiation must use other mechanisms such as `applicationIdSuffix`, build metadata, branch names, or release notes.
 - Only release and hotfix work should change `versionName`.
 
 ### versionCode
@@ -198,6 +201,7 @@ This project uses Semantic Versioning for `versionName` and a monotonically incr
 - Do not commit directly on `develop`.
 - Do not merge to `main` without a PR.
 - Do not bypass approvals or required checks.
+- Do not expose development suffixes in any user-visible version label, including the About screen.
 - Do not change `versionName` or `versionCode` outside release or hotfix work unless the user explicitly requests it.
 - Do not open a release PR without confirming the target SemVer bump.
 - If a PR is squash-merged, ensure the PR title is the final Conventional Commit message that should stay in history.
