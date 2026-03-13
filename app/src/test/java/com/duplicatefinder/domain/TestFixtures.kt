@@ -8,8 +8,10 @@ import com.duplicatefinder.domain.model.ImageHashUpdate
 import com.duplicatefinder.domain.model.ImageItem
 import com.duplicatefinder.domain.model.ScanMode
 import com.duplicatefinder.domain.model.ScanProgress
+import com.duplicatefinder.domain.model.TrashItem
 import com.duplicatefinder.domain.repository.ImageRepository
 import com.duplicatefinder.domain.repository.SettingsRepository
+import com.duplicatefinder.domain.repository.TrashRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -78,33 +80,81 @@ open class BaseImageRepositoryFake : ImageRepository {
 class FakeSettingsRepository(
     threshold: Float = 0.9f
 ) : SettingsRepository {
-    override val similarityThreshold: Flow<Float> = MutableStateFlow(threshold)
-    override val autoDeleteDays: Flow<Int> = MutableStateFlow(30)
-    override val isDarkMode: Flow<Boolean> = MutableStateFlow(false)
-    override val excludedFolders: Flow<Set<String>> = MutableStateFlow(emptySet())
-    override val scanFolders: Flow<Set<String>> = MutableStateFlow(emptySet())
-    override val lastScanTimestamp: Flow<Long> = MutableStateFlow(0L)
-    override val lastDuplicateCount: Flow<Int> = MutableStateFlow(0)
-    override val lastPotentialSavings: Flow<Long> = MutableStateFlow(0L)
-    override val scanMode: Flow<ScanMode> = MutableStateFlow(ScanMode.EXACT_AND_SIMILAR)
+    private val similarityThresholdState = MutableStateFlow(threshold)
+    private val autoDeleteDaysState = MutableStateFlow(30)
+    private val darkModeState = MutableStateFlow(false)
+    private val excludedFoldersState = MutableStateFlow(emptySet<String>())
+    private val scanFoldersState = MutableStateFlow(emptySet<String>())
+    private val lastScanTimestampState = MutableStateFlow(0L)
+    private val lastDuplicateCountState = MutableStateFlow(0)
+    private val lastPotentialSavingsState = MutableStateFlow(0L)
+    private val scanModeState = MutableStateFlow(ScanMode.EXACT_AND_SIMILAR)
 
-    override suspend fun setSimilarityThreshold(threshold: Float) = Unit
+    override val similarityThreshold: Flow<Float> = similarityThresholdState
+    override val autoDeleteDays: Flow<Int> = autoDeleteDaysState
+    override val isDarkMode: Flow<Boolean> = darkModeState
+    override val excludedFolders: Flow<Set<String>> = excludedFoldersState
+    override val scanFolders: Flow<Set<String>> = scanFoldersState
+    override val lastScanTimestamp: Flow<Long> = lastScanTimestampState
+    override val lastDuplicateCount: Flow<Int> = lastDuplicateCountState
+    override val lastPotentialSavings: Flow<Long> = lastPotentialSavingsState
+    override val scanMode: Flow<ScanMode> = scanModeState
 
-    override suspend fun setAutoDeleteDays(days: Int) = Unit
+    override suspend fun setSimilarityThreshold(threshold: Float) {
+        similarityThresholdState.value = threshold
+    }
 
-    override suspend fun setDarkMode(enabled: Boolean) = Unit
+    override suspend fun setAutoDeleteDays(days: Int) {
+        autoDeleteDaysState.value = days
+    }
 
-    override suspend fun setExcludedFolders(folders: Set<String>) = Unit
+    override suspend fun setDarkMode(enabled: Boolean) {
+        darkModeState.value = enabled
+    }
 
-    override suspend fun setScanFolders(folders: Set<String>) = Unit
+    override suspend fun setExcludedFolders(folders: Set<String>) {
+        excludedFoldersState.value = folders
+    }
 
-    override suspend fun setLastScanTimestamp(timestamp: Long) = Unit
+    override suspend fun setScanFolders(folders: Set<String>) {
+        scanFoldersState.value = folders
+    }
+
+    override suspend fun setLastScanTimestamp(timestamp: Long) {
+        lastScanTimestampState.value = timestamp
+    }
 
     override suspend fun setLastScanSummary(
         timestamp: Long,
         duplicateCount: Int,
         potentialSavings: Long
-    ) = Unit
+    ) {
+        lastScanTimestampState.value = timestamp
+        lastDuplicateCountState.value = duplicateCount
+        lastPotentialSavingsState.value = potentialSavings
+    }
 
-    override suspend fun setScanMode(mode: ScanMode) = Unit
+    override suspend fun setScanMode(mode: ScanMode) {
+        scanModeState.value = mode
+    }
+}
+
+open class BaseTrashRepositoryFake : TrashRepository {
+    override fun getTrashItems(): Flow<List<TrashItem>> = flowOf(emptyList())
+
+    override suspend fun getTrashItemById(id: Long): TrashItem? = null
+
+    override suspend fun moveToTrash(images: List<ImageItem>): Result<Int> = Result.success(images.size)
+
+    override suspend fun restoreFromTrash(items: List<TrashItem>): Result<Int> = Result.success(items.size)
+
+    override suspend fun deletePermanently(items: List<TrashItem>): Result<Int> = Result.success(items.size)
+
+    override suspend fun emptyTrash(): Result<Int> = Result.success(0)
+
+    override suspend fun deleteExpiredItems(): Result<Int> = Result.success(0)
+
+    override suspend fun getTrashSize(): Long = 0L
+
+    override suspend fun getTrashItemCount(): Int = 0
 }

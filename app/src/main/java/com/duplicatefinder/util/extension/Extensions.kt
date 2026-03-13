@@ -52,6 +52,10 @@ fun Float.toPercentageString(): String {
     return String.format(Locale.US, "%.0f%%", this * 100)
 }
 
+fun Float.formatMegapixels(): String {
+    return String.format(Locale.US, "%.1f MP", this)
+}
+
 fun Int.pluralize(singular: String, plural: String = "${singular}s"): String {
     return if (this == 1) "$this $singular" else "$this $plural"
 }

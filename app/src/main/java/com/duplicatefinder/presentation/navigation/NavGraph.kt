@@ -29,6 +29,7 @@ import androidx.navigation.compose.rememberNavController
 import com.duplicatefinder.presentation.screens.duplicates.DuplicatesScreen
 import com.duplicatefinder.presentation.screens.home.HomeScreen
 import com.duplicatefinder.presentation.screens.quality.QualityReviewScreen
+import com.duplicatefinder.presentation.screens.resolution.ResolutionReviewScreen
 import com.duplicatefinder.presentation.screens.scan.ScanScreen
 import com.duplicatefinder.presentation.screens.settings.SettingsScreen
 import com.duplicatefinder.presentation.screens.trash.TrashScreen
@@ -77,6 +78,13 @@ sealed class Screen(
     data object Quality : Screen(
         route = "quality_review",
         title = "Quality Review",
+        selectedIcon = Icons.Filled.PhotoLibrary,
+        unselectedIcon = Icons.Outlined.PhotoLibrary
+    )
+
+    data object Resolution : Screen(
+        route = "resolution_review",
+        title = "Resolution Review",
         selectedIcon = Icons.Filled.PhotoLibrary,
         unselectedIcon = Icons.Outlined.PhotoLibrary
     )
@@ -146,6 +154,9 @@ fun DuplicateFinderNavHost(
                     },
                     onReviewQuality = {
                         navController.navigate(Screen.Quality.route)
+                    },
+                    onReviewResolution = {
+                        navController.navigate(Screen.Resolution.route)
                     }
                 )
             }
@@ -177,6 +188,23 @@ fun DuplicateFinderNavHost(
 
             composable(Screen.Quality.route) {
                 QualityReviewScreen(
+                    onBack = {
+                        navController.popBackStack()
+                    },
+                    onOpenTrash = {
+                        navController.navigate(Screen.Trash.route) {
+                            popUpTo(Screen.Home.route) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
+            }
+
+            composable(Screen.Resolution.route) {
+                ResolutionReviewScreen(
                     onBack = {
                         navController.popBackStack()
                     },

@@ -27,6 +27,7 @@
     <string name="home_exact_only_title">Exact only</string>
     <string name="home_exact_only_subtitle">Faster scan, ignores similar matches</string>
     <string name="home_review_quality">Review Image Quality</string>
+    <string name="home_review_resolution">Review Low Resolution</string>
 
     <!-- Scan Screen -->
     <string name="scan_title">Scanning</string>
@@ -70,6 +71,28 @@
     <string name="quality_no_results_title">No quality issues found</string>
     <string name="quality_no_results_subtitle">All scanned images look acceptable with the current quality scoring.</string>
     <string name="quality_select_folders_message">Choose at least one folder in Home and try again.</string>
+
+    <!-- Resolution Review -->
+    <string name="resolution_title">Resolution Review</string>
+    <string name="resolution_filter_title">Megapixel range</string>
+    <string name="resolution_filter_description">Only images between %1$.1f MP and %2$.1f MP will appear in the queue.</string>
+    <string name="resolution_filter_range_value">%1$.1f-%2$.1f MP</string>
+    <string name="resolution_filter_showing">Showing %1$d of %2$d scanned images</string>
+    <string name="resolution_filter_empty_title">No images match the current range</string>
+    <string name="resolution_filter_empty_subtitle">Increase the megapixel range to review more images.</string>
+    <string name="resolution_review_progress">Image %1$d of %2$d</string>
+    <string name="resolution_megapixels_label">Resolution: %1$s</string>
+    <string name="resolution_dimensions_and_size">%1$dx%2$d - %3$s</string>
+    <string name="resolution_folder_label">Folder: %1$s</string>
+    <string name="resolution_review_hint">Low-resolution images can still be useful. Review each item before moving it to trash.</string>
+    <string name="resolution_paused_message">Review paused. Resume when ready or apply the pending batch.</string>
+    <string name="resolution_review_complete_title">Resolution Review Complete</string>
+    <string name="resolution_summary_kept">Kept: %1$d</string>
+    <string name="resolution_summary_moved">Moved to trash: %1$d</string>
+    <string name="resolution_summary_pending">Pending in batch: %1$d</string>
+    <string name="resolution_no_results_title">No eligible images found</string>
+    <string name="resolution_no_results_subtitle">The selected folders do not contain images with valid resolution metadata.</string>
+    <string name="resolution_select_folders_message">Choose at least one folder in Home and try again.</string>
 
     <!-- Duplicates Screen -->
     <string name="duplicates_title">Duplicates</string>
