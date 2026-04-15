@@ -21,55 +21,43 @@ data class ResolutionReviewUiState(
     val requiresFolderSelection: Boolean = false,
     val error: String? = null
 ) {
-    val sliderMegapixelMax: Float
-        get() = maxOf(
-            DEFAULT_REVIEW_MEGAPIXEL_MAX,
-            resolutionItems.maxOfOrNull { it.megapixels } ?: DEFAULT_REVIEW_MEGAPIXEL_MAX
-        )
+    val sliderMegapixelMax: Float = maxOf(
+        DEFAULT_REVIEW_MEGAPIXEL_MAX,
+        resolutionItems.maxOfOrNull { it.megapixels } ?: DEFAULT_REVIEW_MEGAPIXEL_MAX
+    )
 
-    val filteredResolutionItems: List<ResolutionReviewItem>
-        get() = resolutionItems.filter { item ->
+    val filteredResolutionItems: List<ResolutionReviewItem> =
+        resolutionItems.filter { item ->
             item.megapixels in reviewMegapixelMin..reviewMegapixelMax
         }
 
-    val totalCount: Int
-        get() = filteredResolutionItems.size
+    val totalCount: Int = filteredResolutionItems.size
 
-    val hasItems: Boolean
-        get() = resolutionItems.isNotEmpty()
+    val hasItems: Boolean = resolutionItems.isNotEmpty()
 
-    val hasFilterMatches: Boolean
-        get() = filteredResolutionItems.isNotEmpty()
+    val hasFilterMatches: Boolean = filteredResolutionItems.isNotEmpty()
 
-    val currentItem: ResolutionReviewItem?
-        get() = filteredResolutionItems.getOrNull(currentIndex)
+    val currentItem: ResolutionReviewItem? = filteredResolutionItems.getOrNull(currentIndex)
 
-    val reviewedCount: Int
-        get() = filteredResolutionItems.count { item ->
-            val id = item.image.id
-            id in keptImageIds || id in markedForTrashIds || id in movedToTrashIds
-        }
+    val reviewedCount: Int = filteredResolutionItems.count { item ->
+        val id = item.image.id
+        id in keptImageIds || id in markedForTrashIds || id in movedToTrashIds
+    }
 
-    val pendingBatchCount: Int
-        get() = markedForTrashIds.size
+    val pendingBatchCount: Int = markedForTrashIds.size
 
-    val movedToTrashCount: Int
-        get() = movedToTrashIds.size
+    val movedToTrashCount: Int = movedToTrashIds.size
 
-    val keptCount: Int
-        get() = keptImageIds.size
+    val keptCount: Int = keptImageIds.size
 
-    val isReviewComplete: Boolean
-        get() = !isScanning && hasFilterMatches && currentItem == null
+    val isReviewComplete: Boolean = !isScanning && hasFilterMatches && currentItem == null
 
-    val hasNoResults: Boolean
-        get() = !isScanning && !requiresFolderSelection && resolutionItems.isEmpty() && error == null
+    val hasNoResults: Boolean =
+        !isScanning && !requiresFolderSelection && resolutionItems.isEmpty() && error == null
 
-    val hasNoFilterMatches: Boolean
-        get() = !isScanning && hasItems && !hasFilterMatches
+    val hasNoFilterMatches: Boolean = !isScanning && hasItems && !hasFilterMatches
 
-    val filteredOutCount: Int
-        get() = resolutionItems.size - filteredResolutionItems.size
+    val filteredOutCount: Int = resolutionItems.size - filteredResolutionItems.size
 
     companion object {
         const val DEFAULT_REVIEW_MEGAPIXEL_MIN = 0f

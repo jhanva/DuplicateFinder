@@ -35,6 +35,7 @@ class ResolutionReviewViewModel @Inject constructor(
 
     fun startReview() {
         if (scanJob?.isActive == true) return
+        if (_uiState.value.resolutionItems.isNotEmpty()) return
 
         scanJob = viewModelScope.launch {
             try {
@@ -111,11 +112,11 @@ class ResolutionReviewViewModel @Inject constructor(
                         }
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _uiState.update {
                     it.copy(
                         isScanning = false,
-                        error = e.message ?: "Failed to review image resolution."
+                        error = "Failed to review image resolution."
                     )
                 }
             }
@@ -235,17 +236,13 @@ class ResolutionReviewViewModel @Inject constructor(
 
     private fun applyBatchToTrash(ids: Set<Long>) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isApplyingBatch = true, error = null, pendingBatchIds = ids) }
-
-            val state = _uiState.value
-            val images = state.resolutionItems
+            val images = _uiState.value.resolutionItems
                 .filter { it.image.id in ids }
                 .map { it.image }
 
-            if (images.isEmpty()) {
-                _uiState.update { it.copy(isApplyingBatch = false, pendingBatchIds = emptySet()) }
-                return@launch
-            }
+            if (images.isEmpty()) return@launch
+
+            _uiState.update { it.copy(isApplyingBatch = true, error = null, pendingBatchIds = ids) }
 
             val result = moveToTrashUseCase(images)
             result.onSuccess {
@@ -290,7 +287,7 @@ class ResolutionReviewViewModel @Inject constructor(
                             .copy(
                                 isApplyingBatch = false,
                                 pendingBatchIds = emptySet(),
-                                error = error.message ?: "Failed to move images to trash."
+                                error = "Failed to move images to trash."
                             )
                     }
                 }
