@@ -70,29 +70,45 @@ class QualityReviewViewModel @Inject constructor(
 
                 scanQualityImagesUseCase(selectedFolders).collect { scanState ->
                     _uiState.update { current ->
-                        if (scanState.progress.phase == ScanPhase.COMPLETE) {
+                        val isComplete = scanState.progress.phase == ScanPhase.COMPLETE
+                        val hasItems = scanState.items.isNotEmpty()
+
+                        if (hasItems) {
                             val filteredItems = filterItemsByRange(
                                 items = scanState.items,
                                 minScore = current.reviewScoreMin,
                                 maxScore = current.reviewScoreMax
                             )
-                            val firstIndex = nextUndecidedIndex(
-                                items = filteredItems,
-                                start = 0,
-                                kept = emptySet(),
-                                marked = emptySet(),
-                                moved = emptySet()
-                            )
+                            val currentItemId = current.currentItem?.image?.id
+                            val newIndex = if (currentItemId != null) {
+                                val idx = filteredItems.indexOfFirst { it.image.id == currentItemId }
+                                if (idx >= 0) idx else nextUndecidedIndex(
+                                    items = filteredItems,
+                                    start = 0,
+                                    kept = current.keptImageIds,
+                                    marked = current.markedForTrashIds,
+                                    moved = current.movedToTrashIds
+                                )
+                            } else {
+                                nextUndecidedIndex(
+                                    items = filteredItems,
+                                    start = 0,
+                                    kept = current.keptImageIds,
+                                    marked = current.markedForTrashIds,
+                                    moved = current.movedToTrashIds
+                                )
+                            }
+
                             current.copy(
-                                isScanning = false,
+                                isScanning = !isComplete,
                                 scanProgress = scanState.progress,
                                 qualityItems = scanState.items,
-                                currentIndex = firstIndex,
+                                currentIndex = newIndex,
                                 error = null
                             )
                         } else {
                             current.copy(
-                                isScanning = true,
+                                isScanning = !isComplete,
                                 scanProgress = scanState.progress
                             )
                         }
@@ -111,7 +127,7 @@ class QualityReviewViewModel @Inject constructor(
 
     fun keepCurrent() {
         val state = _uiState.value
-        if (state.isPaused || state.isScanning) return
+        if (state.isPaused) return
         val current = state.currentItem ?: return
 
         _uiState.update {
@@ -131,7 +147,7 @@ class QualityReviewViewModel @Inject constructor(
 
     fun markCurrentForTrash() {
         val state = _uiState.value
-        if (state.isPaused || state.isScanning) return
+        if (state.isPaused) return
         val current = state.currentItem ?: return
 
         _uiState.update {

@@ -21,8 +21,8 @@ data class QualityReviewUiState(
     val requiresFolderSelection: Boolean = false,
     val error: String? = null
 ) {
-    val filteredQualityItems: List<ImageQualityItem>
-        get() = qualityItems.filter { item ->
+    val filteredQualityItems: List<ImageQualityItem> =
+        qualityItems.filter { item ->
             item.qualityScore in reviewScoreMin.toFloat()..reviewScoreMax.toFloat()
         }
 
@@ -64,6 +64,12 @@ data class QualityReviewUiState(
 
     val hasNoFilterMatches: Boolean
         get() = !isScanning && hasItems && !hasFilterMatches
+
+    val showFullScanProgress: Boolean
+        get() = isScanning && !hasFilterMatches
+
+    val showInlineScanProgress: Boolean
+        get() = isScanning && hasFilterMatches
 
     val filteredOutCount: Int
         get() = qualityItems.size - filteredQualityItems.size

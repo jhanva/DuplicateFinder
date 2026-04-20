@@ -29,9 +29,14 @@ class ScanResolutionImagesUseCaseTest {
 
         val emissions = ScanResolutionImagesUseCase(repo)(setOf("Camera")).toList()
 
-        assertEquals(4, emissions.size)
+        assertEquals(5, emissions.size)
         assertEquals(ScanPhase.LOADING, emissions[0].progress.phase)
         assertEquals(ScanPhase.ANALYZING, emissions[1].progress.phase)
+
+        val batchEmission = emissions[3]
+        assertEquals(ScanPhase.ANALYZING, batchEmission.progress.phase)
+        assertEquals(listOf(1L, 2L), batchEmission.items.map { it.image.id })
+
         assertEquals(ScanPhase.COMPLETE, emissions.last().progress.phase)
         assertEquals(listOf(1L, 2L), emissions.last().items.map { it.image.id })
     }

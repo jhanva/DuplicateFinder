@@ -146,22 +146,74 @@ class MediaStoreDataSource @Inject constructor(
     }
 
     suspend fun getFolders(): List<String> = withContext(Dispatchers.IO) {
-        val folders = mutableSetOf<String>()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val folders = mutableListOf<String>()
+            val args = Bundle().apply {
+                putStringArray(
+                    ContentResolver.QUERY_ARG_SORT_COLUMNS,
+                    arrayOf(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+                )
+                putInt(
+                    ContentResolver.QUERY_ARG_SORT_DIRECTION,
+                    ContentResolver.QUERY_SORT_DIRECTION_ASCENDING
+                )
+                putString(
+                    ContentResolver.QUERY_ARG_SQL_GROUP_BY,
+                    MediaStore.Images.Media.BUCKET_DISPLAY_NAME
+                )
+            }
+            contentResolver.query(
+                collection,
+                arrayOf(MediaStore.Images.Media.BUCKET_DISPLAY_NAME),
+                args,
+                null
+            )?.use { cursor ->
+                val folderColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+                while (cursor.moveToNext()) {
+                    cursor.getString(folderColumn)?.let { folders.add(it) }
+                }
+            }
+            folders
+        } else {
+            val folders = mutableSetOf<String>()
+            contentResolver.query(
+                collection,
+                arrayOf(MediaStore.Images.Media.BUCKET_DISPLAY_NAME),
+                null,
+                null,
+                null
+            )?.use { cursor ->
+                val folderColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+                while (cursor.moveToNext()) {
+                    cursor.getString(folderColumn)?.let { folders.add(it) }
+                }
+            }
+            folders.toList().sorted()
+        }
+    }
 
-        contentResolver.query(
-            collection,
-            arrayOf(MediaStore.Images.Media.BUCKET_DISPLAY_NAME),
-            null,
-            null,
-            null
-        )?.use { cursor ->
-            val folderColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
-            while (cursor.moveToNext()) {
-                cursor.getString(folderColumn)?.let { folders.add(it) }
+    suspend fun getImagesByIds(ids: List<Long>): List<ImageItem> = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext emptyList()
+
+        val images = mutableListOf<ImageItem>()
+        ids.chunked(QUERY_BATCH_SIZE).forEach { batch ->
+            val placeholders = batch.joinToString(",") { "?" }
+            val selection = "${MediaStore.Images.Media._ID} IN ($placeholders)"
+            val selectionArgs = batch.map { it.toString() }.toTypedArray()
+
+            contentResolver.query(
+                collection,
+                projection,
+                selection,
+                selectionArgs,
+                null
+            )?.use { cursor ->
+                while (cursor.moveToNext()) {
+                    images.add(cursor.toImageItem())
+                }
             }
         }
-
-        folders.toList().sorted()
+        images
     }
 
     suspend fun getImageCount(folders: Set<String> = emptySet()): Int = withContext(Dispatchers.IO) {
@@ -181,6 +233,10 @@ class MediaStoreDataSource @Inject constructor(
         val placeholders = folders.joinToString(",") { "?" }
         val selection = "${MediaStore.Images.Media.BUCKET_DISPLAY_NAME} IN ($placeholders)"
         return selection to folders.toTypedArray()
+    }
+
+    companion object {
+        private const val QUERY_BATCH_SIZE = 900
     }
 
     private fun Cursor.toImageItem(): ImageItem {

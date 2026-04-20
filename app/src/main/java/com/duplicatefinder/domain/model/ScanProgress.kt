@@ -24,6 +24,7 @@ data class ScanProgress(
 enum class ScanPhase {
     IDLE,
     LOADING,
+    INDEXING,
     HASHING,
     ANALYZING,
     COMPARING,

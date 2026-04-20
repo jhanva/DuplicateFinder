@@ -139,17 +139,28 @@ class ScanQualityImagesUseCase @Inject constructor(
             }
 
             finalItems.addAll(processedItems.filterNotNull())
+
+            send(
+                QualityScanState(
+                    progress = ScanProgress(
+                        phase = ScanPhase.ANALYZING,
+                        current = completed.get(),
+                        total = total
+                    ),
+                    items = finalItems.sortedBy { it.qualityScore }
+                )
+            )
+
             offset += batch.size
         }
 
-        val sorted = finalItems.sortedBy { it.qualityScore }
         send(
             QualityScanState(
                 progress = ScanProgress(ScanPhase.COMPLETE, total, total),
-                items = sorted
+                items = finalItems.sortedBy { it.qualityScore }
             )
         )
-    }.flowOn(Dispatchers.Default)
+    }.flowOn(Dispatchers.IO)
 
     companion object {
         private const val BATCH_SIZE = 500

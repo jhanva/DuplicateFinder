@@ -57,9 +57,7 @@ class ScanResolutionImagesUseCase @Inject constructor(
 
             batch.forEach { image ->
                 ResolutionReviewItem.from(image)?.let { item ->
-                    if (item.megapixels <= MAX_SCAN_MEGAPIXELS) {
-                        finalItems.add(item)
-                    }
+                    finalItems.add(item)
                 }
                 processed += 1
 
@@ -78,6 +76,17 @@ class ScanResolutionImagesUseCase @Inject constructor(
                 }
             }
 
+            emit(
+                ResolutionScanState(
+                    progress = ScanProgress(
+                        phase = ScanPhase.ANALYZING,
+                        current = processed,
+                        total = total
+                    ),
+                    items = finalItems.sortedBy { it.pixelCount }
+                )
+            )
+
             offset += batch.size
         }
 
@@ -87,11 +96,10 @@ class ScanResolutionImagesUseCase @Inject constructor(
                 items = finalItems.sortedBy { it.pixelCount }
             )
         )
-    }.flowOn(Dispatchers.Default)
+    }.flowOn(Dispatchers.IO)
 
     companion object {
         private const val BATCH_SIZE = 500
         private const val PROGRESS_STEP = 20
-        private const val MAX_SCAN_MEGAPIXELS = 50f
     }
 }

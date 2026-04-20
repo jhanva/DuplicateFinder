@@ -1,12 +1,14 @@
-package com.duplicatefinder.presentation.screens.resolution
+package com.duplicatefinder.presentation.screens.quality
 
 import com.duplicatefinder.domain.BaseImageRepositoryFake
+import com.duplicatefinder.domain.BaseQualityRepositoryFake
 import com.duplicatefinder.domain.BaseTrashRepositoryFake
 import com.duplicatefinder.domain.FakeSettingsRepository
 import com.duplicatefinder.domain.model.ImageItem
+import com.duplicatefinder.domain.model.ImageQualityMetrics
 import com.duplicatefinder.domain.testImage
 import com.duplicatefinder.domain.usecase.MoveToTrashUseCase
-import com.duplicatefinder.domain.usecase.ScanResolutionImagesUseCase
+import com.duplicatefinder.domain.usecase.ScanQualityImagesUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -24,7 +26,7 @@ import org.junit.Before
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class ResolutionReviewViewModelTest {
+class QualityReviewViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
 
@@ -42,10 +44,11 @@ class ResolutionReviewViewModelTest {
     fun `start review requires selected folders`() = runTest(dispatcher) {
         val settingsRepository = FakeSettingsRepository()
         val imageRepository = object : BaseImageRepositoryFake() {}
-        val viewModel = ResolutionReviewViewModel(
+        val qualityRepository = object : BaseQualityRepositoryFake() {}
+        val viewModel = QualityReviewViewModel(
             settingsRepository = settingsRepository,
             imageRepository = imageRepository,
-            scanResolutionImagesUseCase = ScanResolutionImagesUseCase(imageRepository),
+            scanQualityImagesUseCase = ScanQualityImagesUseCase(imageRepository, qualityRepository),
             moveToTrashUseCase = MoveToTrashUseCase(object : BaseTrashRepositoryFake() {})
         )
 
@@ -54,24 +57,23 @@ class ResolutionReviewViewModelTest {
 
         val state = viewModel.uiState.value
         assertTrue(state.requiresFolderSelection)
-        assertEquals(emptyList<Long>(), state.resolutionItems.map { it.image.id })
+        assertEquals(emptyList<Long>(), state.qualityItems.map { it.image.id })
     }
 
     @Test
     fun `scan completes with images and selects first item`() = runTest(dispatcher) {
-        val small = testImage(id = 1, size = 100).copy(width = 640, height = 480)
-        val large = testImage(id = 2, size = 200).copy(width = 1600, height = 1200)
-        val viewModel = createViewModel(listOf(small, large))
+        val img1 = testImage(id = 1, size = 100).copy(width = 640, height = 480)
+        val img2 = testImage(id = 2, size = 200).copy(width = 1600, height = 1200)
+        val viewModel = createViewModel(listOf(img1, img2))
 
         viewModel.startReview()
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
         assertFalse(state.isScanning)
-        assertEquals(2, state.resolutionItems.size)
+        assertEquals(2, state.qualityItems.size)
         assertEquals(0, state.currentIndex)
         assertNotNull(state.currentItem)
-        assertEquals(1L, state.currentItem?.image?.id)
     }
 
     @Test
@@ -83,11 +85,12 @@ class ResolutionReviewViewModelTest {
         viewModel.startReview()
         advanceUntilIdle()
 
+        val firstItemId = viewModel.uiState.value.currentItem!!.image.id
         viewModel.keepCurrent()
 
         val state = viewModel.uiState.value
-        assertEquals(setOf(1L), state.keptImageIds)
-        assertEquals(2L, state.currentItem?.image?.id)
+        assertEquals(setOf(firstItemId), state.keptImageIds)
+        assertNotNull(state.currentItem)
     }
 
     @Test
@@ -99,11 +102,12 @@ class ResolutionReviewViewModelTest {
         viewModel.startReview()
         advanceUntilIdle()
 
+        val firstItemId = viewModel.uiState.value.currentItem!!.image.id
         viewModel.markCurrentForTrash()
 
         val state = viewModel.uiState.value
-        assertEquals(setOf(1L), state.markedForTrashIds)
-        assertEquals(2L, state.currentItem?.image?.id)
+        assertEquals(setOf(firstItemId), state.markedForTrashIds)
+        assertNotNull(state.currentItem)
     }
 
     @Test
@@ -115,6 +119,7 @@ class ResolutionReviewViewModelTest {
         viewModel.startReview()
         advanceUntilIdle()
 
+        val firstItemId = viewModel.uiState.value.currentItem!!.image.id
         viewModel.markCurrentForTrash()
         viewModel.applyBatchToTrash()
         advanceUntilIdle()
@@ -122,24 +127,7 @@ class ResolutionReviewViewModelTest {
         val state = viewModel.uiState.value
         assertFalse(state.isApplyingBatch)
         assertTrue(state.markedForTrashIds.isEmpty())
-        assertEquals(setOf(1L), state.movedToTrashIds)
-    }
-
-    @Test
-    fun `updateReviewMegapixelRange normalizes and resolves index`() = runTest(dispatcher) {
-        val small = testImage(id = 1, size = 100).copy(width = 640, height = 480)
-        val large = testImage(id = 2, size = 200).copy(width = 4000, height = 3000)
-        val viewModel = createViewModel(listOf(small, large))
-
-        viewModel.startReview()
-        advanceUntilIdle()
-
-        viewModel.updateReviewMegapixelRange(1f, 15f)
-
-        val state = viewModel.uiState.value
-        assertEquals(1f, state.reviewMegapixelMin, 0.01f)
-        assertEquals(1, state.filteredResolutionItems.size)
-        assertEquals(2L, state.currentItem?.image?.id)
+        assertEquals(setOf(firstItemId), state.movedToTrashIds)
     }
 
     @Test
@@ -157,7 +145,13 @@ class ResolutionReviewViewModelTest {
         assertNull(state.currentItem)
     }
 
-    private fun createViewModel(images: List<ImageItem>): ResolutionReviewViewModel {
+    private val defaultMetrics = ImageQualityMetrics(
+        sharpness = 0.5f,
+        detailDensity = 0.5f,
+        blockiness = 0.1f
+    )
+
+    private fun createViewModel(images: List<ImageItem>): QualityReviewViewModel {
         val settingsRepository = FakeSettingsRepository().apply {
             kotlinx.coroutines.runBlocking { setScanFolders(setOf("Camera")) }
         }
@@ -169,10 +163,14 @@ class ResolutionReviewViewModelTest {
                 offset: Int
             ): List<ImageItem> = images.drop(offset).take(limit)
         }
-        return ResolutionReviewViewModel(
+        val qualityRepository = object : BaseQualityRepositoryFake() {
+            override suspend fun calculateQualityMetrics(image: ImageItem): ImageQualityMetrics =
+                defaultMetrics
+        }
+        return QualityReviewViewModel(
             settingsRepository = settingsRepository,
             imageRepository = imageRepository,
-            scanResolutionImagesUseCase = ScanResolutionImagesUseCase(imageRepository),
+            scanQualityImagesUseCase = ScanQualityImagesUseCase(imageRepository, qualityRepository),
             moveToTrashUseCase = MoveToTrashUseCase(object : BaseTrashRepositoryFake() {})
         )
     }

@@ -80,7 +80,7 @@ class ImageRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getImagesByIds(ids: List<Long>): List<ImageItem> {
-        return ids.mapNotNull { mediaStoreDataSource.getImageById(it) }
+        return mediaStoreDataSource.getImagesByIds(ids)
     }
 
     override suspend fun calculateMd5Hash(image: ImageItem): String? {

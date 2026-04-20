@@ -6,10 +6,13 @@ import com.duplicatefinder.domain.model.DuplicateGroup
 import com.duplicatefinder.domain.model.FilterCriteria
 import com.duplicatefinder.domain.model.ImageHashUpdate
 import com.duplicatefinder.domain.model.ImageItem
+import com.duplicatefinder.domain.model.ImageQualityMetrics
+import com.duplicatefinder.domain.model.ImageQualityUpdate
 import com.duplicatefinder.domain.model.ScanMode
 import com.duplicatefinder.domain.model.ScanProgress
 import com.duplicatefinder.domain.model.TrashItem
 import com.duplicatefinder.domain.repository.ImageRepository
+import com.duplicatefinder.domain.repository.QualityRepository
 import com.duplicatefinder.domain.repository.SettingsRepository
 import com.duplicatefinder.domain.repository.TrashRepository
 import kotlinx.coroutines.flow.Flow
@@ -137,6 +140,12 @@ class FakeSettingsRepository(
     override suspend fun setScanMode(mode: ScanMode) {
         scanModeState.value = mode
     }
+}
+
+open class BaseQualityRepositoryFake : QualityRepository {
+    override suspend fun getCachedQualities(imageIds: List<Long>): Map<Long, CachedImageQuality> = emptyMap()
+    override suspend fun saveQualityScores(updates: List<ImageQualityUpdate>) = Unit
+    override suspend fun calculateQualityMetrics(image: ImageItem): ImageQualityMetrics? = null
 }
 
 open class BaseTrashRepositoryFake : TrashRepository {

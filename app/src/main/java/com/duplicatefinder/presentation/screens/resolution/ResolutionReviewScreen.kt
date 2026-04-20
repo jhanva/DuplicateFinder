@@ -30,6 +30,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RangeSlider
@@ -54,6 +55,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.duplicatefinder.R
 import com.duplicatefinder.domain.model.ResolutionReviewItem
+import com.duplicatefinder.presentation.components.ReviewEmptyState
+import com.duplicatefinder.presentation.components.ReviewNoFilterMatchesContent
+import com.duplicatefinder.presentation.components.ReviewSummaryContent
 import com.duplicatefinder.presentation.components.ScanProgressIndicator
 import com.duplicatefinder.util.extension.formatFileSize
 import com.duplicatefinder.util.extension.formatMegapixels
@@ -142,7 +146,7 @@ fun ResolutionReviewScreen(
                 .padding(16.dp)
         ) {
             when {
-                uiState.isScanning -> {
+                uiState.showFullScanProgress -> {
                     ScanProgressIndicator(
                         progress = uiState.scanProgress,
                         modifier = Modifier.align(Alignment.Center)
@@ -156,7 +160,7 @@ fun ResolutionReviewScreen(
                 }
 
                 uiState.requiresFolderSelection -> {
-                    EmptyState(
+                    ReviewEmptyState(
                         title = stringResource(R.string.scan_select_folders_required),
                         subtitle = stringResource(R.string.resolution_select_folders_message),
                         modifier = Modifier.align(Alignment.Center)
@@ -164,7 +168,7 @@ fun ResolutionReviewScreen(
                 }
 
                 uiState.hasNoResults -> {
-                    EmptyState(
+                    ReviewEmptyState(
                         title = stringResource(R.string.resolution_no_results_title),
                         subtitle = stringResource(R.string.resolution_no_results_subtitle),
                         modifier = Modifier.align(Alignment.Center)
@@ -209,6 +213,14 @@ private fun LoadedReviewState(
             onRangeChange = onRangeChange
         )
 
+        if (state.showInlineScanProgress) {
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { state.scanProgress.progress },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
         Spacer(modifier = Modifier.height(16.dp))
 
         Box(
@@ -218,7 +230,9 @@ private fun LoadedReviewState(
         ) {
             when {
                 state.hasNoFilterMatches -> {
-                    NoFilterMatchesContent(
+                    ReviewNoFilterMatchesContent(
+                        filterEmptyTitle = stringResource(R.string.resolution_filter_empty_title),
+                        filterEmptySubtitle = stringResource(R.string.resolution_filter_empty_subtitle),
                         pendingBatchCount = state.pendingBatchCount,
                         onApplyBatch = onApplyBatch,
                         modifier = Modifier.align(Alignment.Center)
@@ -226,8 +240,12 @@ private fun LoadedReviewState(
                 }
 
                 state.isReviewComplete -> {
-                    ReviewSummary(
-                        state = state,
+                    ReviewSummaryContent(
+                        completeTitle = stringResource(R.string.resolution_review_complete_title),
+                        keptText = stringResource(R.string.resolution_summary_kept, state.keptCount),
+                        movedText = stringResource(R.string.resolution_summary_moved, state.movedToTrashCount),
+                        pendingText = stringResource(R.string.resolution_summary_pending, state.pendingBatchCount),
+                        pendingBatchCount = state.pendingBatchCount,
                         onApplyBatch = onApplyBatch,
                         onOpenTrash = onOpenTrash,
                         onBack = onBack
@@ -248,38 +266,6 @@ private fun LoadedReviewState(
                         )
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun NoFilterMatchesContent(
-    pendingBatchCount: Int,
-    onApplyBatch: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        EmptyState(
-            title = stringResource(R.string.resolution_filter_empty_title),
-            subtitle = stringResource(R.string.resolution_filter_empty_subtitle)
-        )
-
-        if (pendingBatchCount > 0) {
-            Spacer(modifier = Modifier.height(16.dp))
-            OutlinedButton(
-                onClick = onApplyBatch,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    imageVector = Icons.Default.RestoreFromTrash,
-                    contentDescription = null
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.quality_apply_batch, pendingBatchCount))
             }
         }
     }
@@ -350,7 +336,8 @@ private fun ReviewFilterCard(
                         roundToSingleDecimal(range.endInclusive)
                     )
                 },
-                valueRange = 0f..sliderMegapixelMax
+                valueRange = 0f..sliderMegapixelMax,
+                steps = ((sliderMegapixelMax * 10).toInt() - 1).coerceAtLeast(0)
             )
 
             HorizontalDivider()
@@ -386,7 +373,7 @@ private fun ReviewContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = stringResource(R.string.resolution_review_progress, reviewedCount + 1, totalCount),
+            text = stringResource(R.string.resolution_review_progress, minOf(reviewedCount + 1, totalCount), totalCount),
             style = MaterialTheme.typography.titleMedium
         )
 
@@ -507,95 +494,6 @@ private fun ReviewContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-    }
-}
-
-@Composable
-private fun ReviewSummary(
-    state: ResolutionReviewUiState,
-    onApplyBatch: () -> Unit,
-    onOpenTrash: () -> Unit,
-    onBack: () -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = stringResource(R.string.resolution_review_complete_title),
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        Text(
-            text = stringResource(R.string.resolution_summary_kept, state.keptCount),
-            style = MaterialTheme.typography.bodyLarge
-        )
-        Text(
-            text = stringResource(R.string.resolution_summary_moved, state.movedToTrashCount),
-            style = MaterialTheme.typography.bodyLarge
-        )
-        Text(
-            text = stringResource(R.string.resolution_summary_pending, state.pendingBatchCount),
-            style = MaterialTheme.typography.bodyLarge
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        if (state.pendingBatchCount > 0) {
-            Button(
-                onClick = onApplyBatch,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(stringResource(R.string.quality_apply_final_batch))
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-        }
-
-        OutlinedButton(
-            onClick = onOpenTrash,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(stringResource(R.string.quality_open_trash))
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        OutlinedButton(
-            onClick = onBack,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(stringResource(R.string.nav_home))
-        }
-    }
-}
-
-@Composable
-private fun EmptyState(
-    title: String,
-    subtitle: String,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
     }
 }
 

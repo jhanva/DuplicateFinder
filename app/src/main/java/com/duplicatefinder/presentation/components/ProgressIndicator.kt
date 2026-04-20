@@ -79,6 +79,7 @@ private fun getPhaseTitle(phase: ScanPhase): String {
     return when (phase) {
         ScanPhase.IDLE -> "Ready to Scan"
         ScanPhase.LOADING -> "Loading images..."
+        ScanPhase.INDEXING -> "Indexing images..."
         ScanPhase.HASHING -> "Calculating hashes..."
         ScanPhase.ANALYZING -> "Analyzing image quality..."
         ScanPhase.COMPARING -> "Finding duplicates..."

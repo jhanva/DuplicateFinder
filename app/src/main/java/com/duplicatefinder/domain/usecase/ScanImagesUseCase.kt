@@ -28,15 +28,16 @@ class ScanImagesUseCase @Inject constructor(
         val total = imageRepository.getImageCount(folders)
         val computeSimilar = scanMode == ScanMode.EXACT_AND_SIMILAR
 
-        send(ScanProgress(ScanPhase.HASHING, 0, total) to emptyList<ImageItem>())
-
         if (total == 0) {
             send(ScanProgress(ScanPhase.COMPLETE, 0, 0) to emptyList<ImageItem>())
             return@channelFlow
         }
 
+        send(ScanProgress(ScanPhase.INDEXING, 0, total) to emptyList<ImageItem>())
+
         val sizeCounts = mutableMapOf<Long, Int>()
         var offset = 0
+        var indexed = 0
         while (offset < total) {
             val batch = imageRepository.getImagesBatch(
                 folders = folders,
@@ -48,6 +49,8 @@ class ScanImagesUseCase @Inject constructor(
             batch.forEach { image ->
                 sizeCounts[image.size] = (sizeCounts[image.size] ?: 0) + 1
             }
+            indexed += batch.size
+            send(ScanProgress(ScanPhase.INDEXING, indexed, total) to emptyList<ImageItem>())
             offset += batch.size
         }
 
@@ -150,7 +153,7 @@ class ScanImagesUseCase @Inject constructor(
         send(
             ScanProgress(ScanPhase.COMPLETE, total, total) to finalImages.toList()
         )
-    }.flowOn(Dispatchers.Default)
+    }.flowOn(Dispatchers.IO)
 
     companion object {
         private const val PROGRESS_STEP = 20

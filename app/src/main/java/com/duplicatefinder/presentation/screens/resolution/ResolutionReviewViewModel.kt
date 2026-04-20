@@ -35,7 +35,6 @@ class ResolutionReviewViewModel @Inject constructor(
 
     fun startReview() {
         if (scanJob?.isActive == true) return
-        if (_uiState.value.resolutionItems.isNotEmpty()) return
 
         scanJob = viewModelScope.launch {
             try {
@@ -72,51 +71,76 @@ class ResolutionReviewViewModel @Inject constructor(
 
                 scanResolutionImagesUseCase(selectedFolders).collect { scanState ->
                     _uiState.update { current ->
-                        if (scanState.progress.phase == ScanPhase.COMPLETE) {
-                            val sliderMax = maxOf(
-                                ResolutionReviewUiState.DEFAULT_REVIEW_MEGAPIXEL_MAX,
-                                scanState.items.maxOfOrNull { it.megapixels }
-                                    ?: ResolutionReviewUiState.DEFAULT_REVIEW_MEGAPIXEL_MAX
-                            )
-                            val reviewMin = ResolutionReviewUiState.DEFAULT_REVIEW_MEGAPIXEL_MIN
-                            val reviewMax = minOf(
-                                ResolutionReviewUiState.DEFAULT_REVIEW_MEGAPIXEL_MAX,
-                                sliderMax
-                            )
+                        val isComplete = scanState.progress.phase == ScanPhase.COMPLETE
+                        val hasItems = scanState.items.isNotEmpty()
+
+                        if (hasItems) {
+                            val isFirstItems = current.resolutionItems.isEmpty()
+                            val reviewMin: Float
+                            val reviewMax: Float
+                            if (isFirstItems) {
+                                val sliderMax = maxOf(
+                                    ResolutionReviewUiState.DEFAULT_REVIEW_MEGAPIXEL_MAX,
+                                    scanState.items.maxOfOrNull { it.megapixels }
+                                        ?: ResolutionReviewUiState.DEFAULT_REVIEW_MEGAPIXEL_MAX
+                                )
+                                reviewMin = ResolutionReviewUiState.DEFAULT_REVIEW_MEGAPIXEL_MIN
+                                reviewMax = minOf(
+                                    ResolutionReviewUiState.DEFAULT_REVIEW_MEGAPIXEL_MAX,
+                                    sliderMax
+                                )
+                            } else {
+                                reviewMin = current.reviewMegapixelMin
+                                reviewMax = current.reviewMegapixelMax
+                            }
+
                             val filteredItems = filterItemsByRange(
                                 items = scanState.items,
                                 minMegapixels = reviewMin,
                                 maxMegapixels = reviewMax
                             )
-                            val firstIndex = nextUndecidedIndex(
-                                items = filteredItems,
-                                start = 0,
-                                kept = emptySet(),
-                                marked = emptySet(),
-                                moved = emptySet()
-                            )
+                            val currentItemId = current.currentItem?.image?.id
+                            val newIndex = if (currentItemId != null) {
+                                val idx = filteredItems.indexOfFirst { it.image.id == currentItemId }
+                                if (idx >= 0) idx else nextUndecidedIndex(
+                                    items = filteredItems,
+                                    start = 0,
+                                    kept = current.keptImageIds,
+                                    marked = current.markedForTrashIds,
+                                    moved = current.movedToTrashIds
+                                )
+                            } else {
+                                nextUndecidedIndex(
+                                    items = filteredItems,
+                                    start = 0,
+                                    kept = current.keptImageIds,
+                                    marked = current.markedForTrashIds,
+                                    moved = current.movedToTrashIds
+                                )
+                            }
+
                             current.copy(
-                                isScanning = false,
+                                isScanning = !isComplete,
                                 scanProgress = scanState.progress,
                                 resolutionItems = scanState.items,
                                 reviewMegapixelMin = reviewMin,
                                 reviewMegapixelMax = reviewMax,
-                                currentIndex = firstIndex,
+                                currentIndex = newIndex,
                                 error = null
                             )
                         } else {
                             current.copy(
-                                isScanning = true,
+                                isScanning = !isComplete,
                                 scanProgress = scanState.progress
                             )
                         }
                     }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
                         isScanning = false,
-                        error = "Failed to review image resolution."
+                        error = e.message ?: "Failed to review image resolution."
                     )
                 }
             }
@@ -125,7 +149,7 @@ class ResolutionReviewViewModel @Inject constructor(
 
     fun keepCurrent() {
         val state = _uiState.value
-        if (state.isPaused || state.isScanning) return
+        if (state.isPaused) return
         val current = state.currentItem ?: return
 
         _uiState.update {
@@ -145,7 +169,7 @@ class ResolutionReviewViewModel @Inject constructor(
 
     fun markCurrentForTrash() {
         val state = _uiState.value
-        if (state.isPaused || state.isScanning) return
+        if (state.isPaused) return
         val current = state.currentItem ?: return
 
         _uiState.update {
@@ -318,22 +342,6 @@ class ResolutionReviewViewModel @Inject constructor(
         )
     }
 
-    private fun nextUndecidedIndex(
-        items: List<ResolutionReviewItem>,
-        start: Int,
-        kept: Set<Long>,
-        marked: Set<Long>,
-        moved: Set<Long>
-    ): Int {
-        for (index in start until items.size) {
-            val id = items[index].image.id
-            if (id !in kept && id !in marked && id !in moved) {
-                return index
-            }
-        }
-        return -1
-    }
-
     private fun filterItemsByRange(
         items: List<ResolutionReviewItem>,
         minMegapixels: Float,
@@ -359,7 +367,7 @@ internal fun resolveCurrentIndexAfterMegapixelRangeChange(
     marked: Set<Long>,
     moved: Set<Long>
 ): Int {
-    val firstUndecided = nextUndecidedMegapixelIndexForRangeChange(
+    val firstUndecided = nextUndecidedIndex(
         items = items,
         start = 0,
         kept = kept,
@@ -383,7 +391,7 @@ internal fun resolveCurrentIndexAfterMegapixelRangeChange(
     }
 }
 
-private fun nextUndecidedMegapixelIndexForRangeChange(
+internal fun nextUndecidedIndex(
     items: List<ResolutionReviewItem>,
     start: Int,
     kept: Set<Long>,

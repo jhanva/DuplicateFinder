@@ -2,10 +2,12 @@ package com.duplicatefinder.presentation.navigation
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.PhotoLibrary
@@ -85,8 +87,8 @@ sealed class Screen(
     data object Resolution : Screen(
         route = "resolution_review",
         title = "Resolution Review",
-        selectedIcon = Icons.Filled.PhotoLibrary,
-        unselectedIcon = Icons.Outlined.PhotoLibrary
+        selectedIcon = Icons.Filled.AspectRatio,
+        unselectedIcon = Icons.Outlined.AspectRatio
     )
 }
 
