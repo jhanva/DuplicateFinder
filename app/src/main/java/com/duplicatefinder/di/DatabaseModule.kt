@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.duplicatefinder.data.local.db.AppDatabase
 import com.duplicatefinder.data.local.db.dao.ImageHashDao
 import com.duplicatefinder.data.local.db.dao.ImageQualityDao
+import com.duplicatefinder.data.local.db.dao.OverlayDetectionDao
 import com.duplicatefinder.data.local.db.dao.TrashDao
 import dagger.Module
 import dagger.Provides
@@ -27,7 +28,10 @@ object DatabaseModule {
             AppDatabase::class.java,
             AppDatabase.DATABASE_NAME
         )
-            .addMigrations(AppDatabase.MIGRATION_1_2)
+            .addMigrations(
+                AppDatabase.MIGRATION_1_2,
+                AppDatabase.MIGRATION_2_3
+            )
             .build()
     }
 
@@ -41,6 +45,12 @@ object DatabaseModule {
     @Singleton
     fun provideImageQualityDao(database: AppDatabase): ImageQualityDao {
         return database.imageQualityDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideOverlayDetectionDao(database: AppDatabase): OverlayDetectionDao {
+        return database.overlayDetectionDao()
     }
 
     @Provides

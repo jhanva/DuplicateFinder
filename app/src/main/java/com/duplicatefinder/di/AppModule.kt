@@ -1,6 +1,7 @@
 package com.duplicatefinder.di
 
 import android.content.Context
+import com.duplicatefinder.BuildConfig
 import com.duplicatefinder.data.local.datastore.SettingsDataStore
 import com.duplicatefinder.data.media.MediaStoreDataSource
 import com.duplicatefinder.util.hash.DifferenceHashCalculator
@@ -12,6 +13,8 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import java.io.File
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Module
@@ -65,4 +68,23 @@ object AppModule {
     ): ImageProcessor {
         return ImageProcessor(context)
     }
+
+    @Provides
+    @Singleton
+    @Named("overlayModelManifestUrl")
+    fun provideOverlayModelManifestUrl(): String = BuildConfig.OVERLAY_MODEL_MANIFEST_URL
+
+    @Provides
+    @Singleton
+    @Named("overlayModelBundleDir")
+    fun provideOverlayModelBundleDir(
+        @ApplicationContext context: Context
+    ): File = File(context.filesDir, "overlay_models/current").also { it.mkdirs() }
+
+    @Provides
+    @Singleton
+    @Named("overlayPreviewDir")
+    fun provideOverlayPreviewDir(
+        @ApplicationContext context: Context
+    ): File = File(context.cacheDir, "overlay_preview").also { it.mkdirs() }
 }

@@ -30,6 +30,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.duplicatefinder.presentation.screens.duplicates.DuplicatesScreen
 import com.duplicatefinder.presentation.screens.home.HomeScreen
+import com.duplicatefinder.presentation.screens.overlay.OverlayReviewScreen
 import com.duplicatefinder.presentation.screens.quality.QualityReviewScreen
 import com.duplicatefinder.presentation.screens.resolution.ResolutionReviewScreen
 import com.duplicatefinder.presentation.screens.scan.ScanScreen
@@ -89,6 +90,13 @@ sealed class Screen(
         title = "Resolution Review",
         selectedIcon = Icons.Filled.AspectRatio,
         unselectedIcon = Icons.Outlined.AspectRatio
+    )
+
+    data object Overlay : Screen(
+        route = "overlay_review",
+        title = "Review Watermarks",
+        selectedIcon = Icons.Filled.PhotoLibrary,
+        unselectedIcon = Icons.Outlined.PhotoLibrary
     )
 }
 
@@ -159,6 +167,9 @@ fun DuplicateFinderNavHost(
                     },
                     onReviewResolution = {
                         navController.navigate(Screen.Resolution.route)
+                    },
+                    onReviewWatermarks = {
+                        navController.navigate(Screen.Overlay.route)
                     }
                 )
             }
@@ -207,6 +218,23 @@ fun DuplicateFinderNavHost(
 
             composable(Screen.Resolution.route) {
                 ResolutionReviewScreen(
+                    onBack = {
+                        navController.popBackStack()
+                    },
+                    onOpenTrash = {
+                        navController.navigate(Screen.Trash.route) {
+                            popUpTo(Screen.Home.route) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                )
+            }
+
+            composable(Screen.Overlay.route) {
+                OverlayReviewScreen(
                     onBack = {
                         navController.popBackStack()
                     },

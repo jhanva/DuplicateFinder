@@ -28,6 +28,7 @@
     <string name="home_exact_only_subtitle">Faster scan, ignores similar matches</string>
     <string name="home_review_quality">Review Image Quality</string>
     <string name="home_review_resolution">Review Low Resolution</string>
+    <string name="home_review_watermarks">Review Watermarks</string>
 
     <!-- Scan Screen -->
     <string name="scan_title">Scanning</string>
@@ -71,6 +72,35 @@
     <string name="quality_no_results_title">No quality issues found</string>
     <string name="quality_no_results_subtitle">All scanned images look acceptable with the current quality scoring.</string>
     <string name="quality_select_folders_message">Choose at least one folder in Home and try again.</string>
+
+    <!-- Overlay Review -->
+    <string name="overlay_title">Review Watermarks</string>
+    <string name="overlay_pause">Pause review</string>
+    <string name="overlay_resume">Resume review</string>
+    <string name="overlay_filter_title">Overlay score range</string>
+    <string name="overlay_filter_description">Only candidates scored between %1$d and %2$d will appear in the queue.</string>
+    <string name="overlay_filter_range_value">%1$d-%2$d/100</string>
+    <string name="overlay_filter_showing">Showing %1$d of %2$d detected candidates</string>
+    <string name="overlay_filter_empty_title">No images match the current score range</string>
+    <string name="overlay_filter_empty_subtitle">Lower the minimum score to review more possible overlays.</string>
+    <string name="overlay_review_progress">Image %1$d of %2$d</string>
+    <string name="overlay_score_label">Overlay score: %1$d/100</string>
+    <string name="overlay_kind_label">Detected types: %1$s</string>
+    <string name="overlay_coverage_label">Estimated coverage: %1$d%%</string>
+    <string name="overlay_remove_watermark">Remove Watermark</string>
+    <string name="overlay_apply_batch">Apply Batch (%1$d)</string>
+    <string name="overlay_paused_message">Review paused. Resume when ready or apply the pending batch.</string>
+    <string name="overlay_preview_title">Cleaned preview</string>
+    <string name="overlay_preview_keep_cleaned">Keep Cleaned</string>
+    <string name="overlay_preview_delete_all">Delete All</string>
+    <string name="overlay_preview_skip">Skip</string>
+    <string name="overlay_review_complete_title">Watermark Review Complete</string>
+    <string name="overlay_summary_kept">Kept original: %1$d</string>
+    <string name="overlay_summary_moved">Moved to trash: %1$d</string>
+    <string name="overlay_summary_pending">Pending in batch: %1$d</string>
+    <string name="overlay_no_results_title">No watermark candidates found</string>
+    <string name="overlay_no_results_subtitle">No images in the selected folders crossed the current overlay threshold.</string>
+    <string name="overlay_select_folders_message">Choose at least one folder in Home and try again.</string>
 
     <!-- Resolution Review -->
     <string name="resolution_title">Resolution Review</string>

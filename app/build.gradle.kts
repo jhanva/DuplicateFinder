@@ -15,6 +15,7 @@ android {
         targetSdk = 34
         versionCode = 4
         versionName = "1.1.0"
+        buildConfigField("String", "OVERLAY_MODEL_MANIFEST_URL", "\"\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -99,6 +100,11 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // TensorFlow Lite
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

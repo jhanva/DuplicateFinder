@@ -57,6 +57,7 @@ fun HomeScreen(
     onViewDuplicates: () -> Unit,
     onReviewQuality: () -> Unit,
     onReviewResolution: () -> Unit,
+    onReviewWatermarks: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -300,6 +301,18 @@ fun HomeScreen(
                                 enabled = uiState.selectedFolders.isNotEmpty()
                             ) {
                                 Text(stringResource(R.string.home_review_resolution))
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            OutlinedButton(
+                                onClick = onReviewWatermarks,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                enabled = uiState.selectedFolders.isNotEmpty()
+                            ) {
+                                Text(stringResource(R.string.home_review_watermarks))
                             }
                         }
                     }
