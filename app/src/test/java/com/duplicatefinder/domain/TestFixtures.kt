@@ -217,10 +217,13 @@ open class BaseOverlayRepositoryFake : OverlayRepository {
 
 open class BaseOverlayModelBundleRepositoryFake : OverlayModelBundleRepository {
     var activeBundleInfo: OverlayModelBundleInfo? = null
+    var downloadConfigured: Boolean = false
     var downloadResult: Result<OverlayModelBundleInfo> = Result.failure(
         IllegalStateException("Bundle download not configured")
     )
     var downloadCallCount: Int = 0
+
+    override fun isDownloadConfigured(): Boolean = downloadConfigured
 
     override suspend fun getActiveBundleInfo(): OverlayModelBundleInfo? = activeBundleInfo
 

@@ -8,6 +8,7 @@ import com.duplicatefinder.domain.model.ScanProgress
 import com.duplicatefinder.domain.repository.ImageRepository
 import com.duplicatefinder.domain.repository.QualityRepository
 import com.duplicatefinder.util.image.ImageQualityScorer
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +23,16 @@ class ScanQualityImagesUseCase @Inject constructor(
     private val imageRepository: ImageRepository,
     private val qualityRepository: QualityRepository
 ) {
+    private var ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+
+    constructor(
+        imageRepository: ImageRepository,
+        qualityRepository: QualityRepository,
+        ioDispatcher: CoroutineDispatcher
+    ) : this(imageRepository, qualityRepository) {
+        this.ioDispatcher = ioDispatcher
+    }
+
 
     operator fun invoke(
         folders: Set<String>
@@ -160,7 +171,7 @@ class ScanQualityImagesUseCase @Inject constructor(
                 items = finalItems.sortedBy { it.qualityScore }
             )
         )
-    }.flowOn(Dispatchers.IO)
+    }.flowOn(ioDispatcher)
 
     companion object {
         private const val BATCH_SIZE = 500

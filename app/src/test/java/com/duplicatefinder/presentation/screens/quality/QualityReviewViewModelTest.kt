@@ -48,7 +48,11 @@ class QualityReviewViewModelTest {
         val viewModel = QualityReviewViewModel(
             settingsRepository = settingsRepository,
             imageRepository = imageRepository,
-            scanQualityImagesUseCase = ScanQualityImagesUseCase(imageRepository, qualityRepository),
+            scanQualityImagesUseCase = ScanQualityImagesUseCase(
+                imageRepository,
+                qualityRepository,
+                dispatcher
+            ),
             moveToTrashUseCase = MoveToTrashUseCase(object : BaseTrashRepositoryFake() {})
         )
 
@@ -170,7 +174,11 @@ class QualityReviewViewModelTest {
         return QualityReviewViewModel(
             settingsRepository = settingsRepository,
             imageRepository = imageRepository,
-            scanQualityImagesUseCase = ScanQualityImagesUseCase(imageRepository, qualityRepository),
+            scanQualityImagesUseCase = ScanQualityImagesUseCase(
+                imageRepository,
+                qualityRepository,
+                dispatcher
+            ),
             moveToTrashUseCase = MoveToTrashUseCase(object : BaseTrashRepositoryFake() {})
         )
     }

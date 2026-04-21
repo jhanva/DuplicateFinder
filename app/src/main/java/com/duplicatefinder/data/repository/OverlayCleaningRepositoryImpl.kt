@@ -1,14 +1,14 @@
 package com.duplicatefinder.data.repository
 
-import android.content.ContentValues
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
-import android.os.Build
-import android.provider.MediaStore
 import com.duplicatefinder.domain.model.CleaningPreview
 import com.duplicatefinder.domain.model.ImageItem
 import com.duplicatefinder.domain.model.OverlayDetection
 import com.duplicatefinder.domain.model.OverlayPreviewDecision
+import com.duplicatefinder.domain.model.OverlayRegion
 import com.duplicatefinder.domain.model.PreviewStatus
 import com.duplicatefinder.domain.repository.OverlayCleaningRepository
 import com.duplicatefinder.domain.repository.OverlayModelBundleInfo
@@ -22,12 +22,14 @@ import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
+import kotlin.math.max
 
 @Singleton
 class OverlayCleaningRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val trashRepository: TrashRepository,
-    @Named("overlayPreviewDir") private val previewDir: File
+    @Named("overlayPreviewDir") private val previewDir: File,
+    @Named("overlayModelBundleDir") private val bundleDir: File
 ) : OverlayCleaningRepository {
 
     override suspend fun generatePreview(
@@ -35,19 +37,26 @@ class OverlayCleaningRepositoryImpl @Inject constructor(
         detection: OverlayDetection,
         bundleInfo: OverlayModelBundleInfo
     ): Result<CleaningPreview> = withContext(Dispatchers.IO) {
+        val startedAt = System.currentTimeMillis()
+        val previewFile = createPreviewFile(image, bundleInfo.bundleVersion)
         runCatching {
-            val startedAt = System.currentTimeMillis()
+            ensureBundleAvailable(bundleInfo)
             previewDir.mkdirs()
-            val previewFile = File(
-                previewDir,
-                "${image.id}_${System.currentTimeMillis()}_${image.name}"
-            )
 
-            context.contentResolver.openInputStream(image.uri)?.use { input ->
-                FileOutputStream(previewFile).use { output ->
-                    input.copyTo(output)
+            val sourceBitmap = decodePreviewBitmap(
+                image = image,
+                maxDimension = bundleInfo.inputSizeInpainter.coerceAtLeast(MIN_PREVIEW_DIMENSION)
+            ) ?: throw IOException("Unable to decode source image for preview generation.")
+            val cleanedBitmap = renderPreviewBitmap(sourceBitmap, detection.maskBounds)
+
+            FileOutputStream(previewFile).use { output ->
+                if (!cleanedBitmap.compress(compressFormatFor(image), PREVIEW_QUALITY, output)) {
+                    throw IOException("Unable to write cleaned preview to cache.")
                 }
-            } ?: throw IOException("Unable to open source image for preview generation.")
+            }
+            if (!previewFile.exists() || previewFile.length() <= 0L) {
+                throw IOException("Generated preview file is empty.")
+            }
 
             CleaningPreview(
                 sourceImage = image,
@@ -57,6 +66,8 @@ class OverlayCleaningRepositoryImpl @Inject constructor(
                 generationTimeMs = System.currentTimeMillis() - startedAt,
                 status = PreviewStatus.READY
             )
+        }.onFailure {
+            previewFile.delete()
         }
     }
 
@@ -79,9 +90,8 @@ class OverlayCleaningRepositoryImpl @Inject constructor(
 
     override suspend fun discardPreview(preview: CleaningPreview): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            preview.previewUri.path?.let { path ->
-                File(path).takeIf { it.exists() }?.delete()
-            }
+            deleteUriFile(preview.previewUri)
+            preview.maskUri?.let(::deleteUriFile)
             Unit
         }
     }
@@ -89,44 +99,155 @@ class OverlayCleaningRepositoryImpl @Inject constructor(
     private suspend fun replaceOriginal(
         image: ImageItem,
         preview: CleaningPreview
-    ): Result<Unit> = runCatching {
-        val backupFile = File(previewDir, "${image.id}_backup_${image.name}")
-        context.contentResolver.openInputStream(image.uri)?.use { input ->
-            FileOutputStream(backupFile).use { output ->
-                input.copyTo(output)
-            }
-        } ?: throw IOException("Unable to create backup for ${image.name}.")
-
-        try {
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
             val previewFile = preview.previewUri.path?.let(::File)
                 ?: throw IOException("Preview file path is missing.")
-            if (!previewFile.exists()) {
+            if (!previewFile.exists() || previewFile.length() <= 0L) {
                 throw IOException("Preview file does not exist.")
             }
 
-            context.contentResolver.openOutputStream(image.uri, "wt")?.use { output ->
-                previewFile.inputStream().use { input ->
-                    input.copyTo(output)
-                }
-            } ?: throw IOException("Unable to overwrite original image.")
+            val backupFile = File(previewDir, "${image.id}_backup_${image.name}")
+            createBackup(image, backupFile)
 
-            discardPreview(preview).getOrThrow()
-            backupFile.delete()
-        } catch (error: Exception) {
-            restoreBackup(image = image, backupFile = backupFile)
-            throw error
+            try {
+                context.contentResolver.openOutputStream(image.uri, "wt")?.use { output ->
+                    previewFile.inputStream().use { input ->
+                        input.copyTo(output)
+                    }
+                } ?: throw IOException("Unable to overwrite original image.")
+
+                validateVisibleImage(image)
+                discardPreview(preview).getOrThrow()
+                backupFile.delete()
+                Unit
+            } catch (error: Exception) {
+                restoreBackup(image = image, backupFile = backupFile)
+                discardPreview(preview)
+                throw error
+            }
         }
     }
 
     private suspend fun deleteAll(
         image: ImageItem,
         preview: CleaningPreview
-    ): Result<Unit> {
-        discardPreview(preview).getOrElse { return Result.failure(it) }
-        return trashRepository.moveToTrash(listOf(image)).fold(
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        discardPreview(preview).getOrElse { return@withContext Result.failure(it) }
+        trashRepository.moveToTrash(listOf(image)).fold(
             onSuccess = { Result.success(Unit) },
             onFailure = { Result.failure(it) }
         )
+    }
+
+    private fun createPreviewFile(image: ImageItem, modelVersion: String): File {
+        val startedAt = System.currentTimeMillis()
+        val extension = extensionFor(image)
+        return File(previewDir, "${image.id}_${modelVersion}_$startedAt.$extension")
+    }
+
+    private fun ensureBundleAvailable(bundleInfo: OverlayModelBundleInfo) {
+        val requiredPaths = listOf(
+            bundleInfo.detectorStage1Path,
+            bundleInfo.detectorStage2Path,
+            bundleInfo.inpainterPath
+        )
+        val missingFiles = requiredPaths.filterNot { relativePath ->
+            File(bundleDir, relativePath.substringAfterLast('/')).let { file ->
+                file.exists() && file.length() > 0L
+            }
+        }
+        if (missingFiles.isNotEmpty()) {
+            throw IOException("Overlay model bundle is incomplete or missing.")
+        }
+    }
+
+    private fun decodePreviewBitmap(image: ImageItem, maxDimension: Int): Bitmap? {
+        val bounds = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        context.contentResolver.openInputStream(image.uri)?.use { stream ->
+            BitmapFactory.decodeStream(stream, null, bounds)
+        }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        val maxSourceDimension = max(bounds.outWidth, bounds.outHeight)
+        var sampleSize = 1
+        while ((maxSourceDimension / sampleSize) > maxDimension) {
+            sampleSize *= 2
+        }
+
+        val decodeOptions = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize.coerceAtLeast(1)
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        return context.contentResolver.openInputStream(image.uri)?.use { stream ->
+            BitmapFactory.decodeStream(stream, null, decodeOptions)
+        }
+    }
+
+    private fun renderPreviewBitmap(
+        sourceBitmap: Bitmap,
+        regions: List<OverlayRegion>
+    ): Bitmap {
+        val mutableBitmap = sourceBitmap.copy(Bitmap.Config.ARGB_8888, true)
+        val pixels = IntArray(mutableBitmap.width * mutableBitmap.height)
+        mutableBitmap.getPixels(
+            pixels,
+            0,
+            mutableBitmap.width,
+            0,
+            0,
+            mutableBitmap.width,
+            mutableBitmap.height
+        )
+        val cleanedPixels = OverlayImageAnalysis.cleanOverlay(
+            pixels = pixels,
+            width = mutableBitmap.width,
+            height = mutableBitmap.height,
+            regions = regions
+        )
+        mutableBitmap.setPixels(
+            cleanedPixels,
+            0,
+            mutableBitmap.width,
+            0,
+            0,
+            mutableBitmap.width,
+            mutableBitmap.height
+        )
+        return mutableBitmap
+    }
+
+    private fun createBackup(image: ImageItem, backupFile: File) {
+        context.contentResolver.openInputStream(image.uri)?.use { input ->
+            FileOutputStream(backupFile).use { output ->
+                input.copyTo(output)
+            }
+        } ?: throw IOException("Unable to create backup for ${image.name}.")
+    }
+
+    private fun validateVisibleImage(image: ImageItem) {
+        val descriptor = context.contentResolver.openAssetFileDescriptor(image.uri, "r")
+            ?: throw IOException("Unable to validate replaced image.")
+        descriptor.use {
+            when {
+                it.length > 0L -> return
+                it.length == 0L -> throw IOException("Replaced image is empty.")
+                else -> Unit
+            }
+        }
+
+        val bounds = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        context.contentResolver.openInputStream(image.uri)?.use { stream ->
+            BitmapFactory.decodeStream(stream, null, bounds)
+        } ?: throw IOException("Unable to validate replaced image contents.")
+
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            throw IOException("Replaced image is unreadable.")
+        }
     }
 
     private fun restoreBackup(
@@ -144,38 +265,30 @@ class OverlayCleaningRepositoryImpl @Inject constructor(
         backupFile.delete()
     }
 
-    @Suppress("unused")
-    private fun buildReplacementContentValues(image: ImageItem): ContentValues {
-        val relativePath = extractRelativePath(image.path)
-        return ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, image.name)
-            put(MediaStore.Images.Media.MIME_TYPE, image.mimeType)
-            if (!relativePath.isNullOrBlank() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.Images.Media.RELATIVE_PATH, relativePath)
-            }
+    private fun deleteUriFile(uri: Uri) {
+        uri.path?.let { path ->
+            File(path).takeIf { it.exists() }?.delete()
         }
     }
 
-    private fun extractRelativePath(originalPath: String): String? {
-        if (originalPath.isBlank()) return null
-
-        val normalized = originalPath.replace('\\', '/').trim()
-        val relativePath = when {
-            normalized.startsWith("/storage/emulated/0/") ->
-                normalized.removePrefix("/storage/emulated/0/")
-            normalized.startsWith("storage/emulated/0/") ->
-                normalized.removePrefix("storage/emulated/0/")
-            normalized.startsWith("/storage/self/primary/") ->
-                normalized.removePrefix("/storage/self/primary/")
-            normalized.startsWith("storage/self/primary/") ->
-                normalized.removePrefix("storage/self/primary/")
-            normalized.startsWith("/sdcard/") ->
-                normalized.removePrefix("/sdcard/")
-            normalized.startsWith("sdcard/") ->
-                normalized.removePrefix("sdcard/")
-            else -> normalized.trimStart('/')
+    private fun compressFormatFor(image: ImageItem): Bitmap.CompressFormat {
+        return when {
+            image.mimeType.contains("png", ignoreCase = true) -> Bitmap.CompressFormat.PNG
+            image.mimeType.contains("webp", ignoreCase = true) -> Bitmap.CompressFormat.WEBP
+            else -> Bitmap.CompressFormat.JPEG
         }
-        val parent = relativePath.substringBeforeLast('/', "")
-        return if (parent.isBlank()) null else "$parent/"
+    }
+
+    private fun extensionFor(image: ImageItem): String {
+        return when {
+            image.mimeType.contains("png", ignoreCase = true) -> "png"
+            image.mimeType.contains("webp", ignoreCase = true) -> "webp"
+            else -> "jpg"
+        }
+    }
+
+    companion object {
+        private const val PREVIEW_QUALITY = 95
+        private const val MIN_PREVIEW_DIMENSION = 512
     }
 }

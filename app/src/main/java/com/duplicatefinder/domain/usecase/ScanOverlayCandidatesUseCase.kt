@@ -7,6 +7,7 @@ import com.duplicatefinder.domain.model.ScanPhase
 import com.duplicatefinder.domain.model.ScanProgress
 import com.duplicatefinder.domain.repository.ImageRepository
 import com.duplicatefinder.domain.repository.OverlayRepository
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -17,6 +18,16 @@ class ScanOverlayCandidatesUseCase @Inject constructor(
     private val imageRepository: ImageRepository,
     private val overlayRepository: OverlayRepository
 ) {
+    private var ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+
+    constructor(
+        imageRepository: ImageRepository,
+        overlayRepository: OverlayRepository,
+        ioDispatcher: CoroutineDispatcher
+    ) : this(imageRepository, overlayRepository) {
+        this.ioDispatcher = ioDispatcher
+    }
+
 
     operator fun invoke(
         folders: Set<String>,
@@ -71,10 +82,14 @@ class ScanOverlayCandidatesUseCase @Inject constructor(
             )
 
             val missing = batch.filter { it.id !in cached }
-            val freshDetections = overlayRepository.detectOverlayCandidates(
-                images = missing,
-                modelVersion = modelVersion
-            )
+            val freshDetections = if (missing.isNotEmpty()) {
+                overlayRepository.detectOverlayCandidates(
+                    images = missing,
+                    modelVersion = modelVersion
+                )
+            } else {
+                emptyList()
+            }
             if (freshDetections.isNotEmpty()) {
                 overlayRepository.saveDetections(freshDetections)
             }
@@ -116,7 +131,7 @@ class ScanOverlayCandidatesUseCase @Inject constructor(
                 scannedCount = total
             )
         )
-    }.flowOn(Dispatchers.IO)
+    }.flowOn(ioDispatcher)
 
     private fun buildReviewItems(
         detections: List<OverlayDetection>,

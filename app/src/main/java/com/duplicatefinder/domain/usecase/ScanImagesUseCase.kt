@@ -6,6 +6,7 @@ import com.duplicatefinder.domain.model.ScanMode
 import com.duplicatefinder.domain.model.ScanPhase
 import com.duplicatefinder.domain.model.ScanProgress
 import com.duplicatefinder.domain.repository.ImageRepository
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +20,15 @@ import javax.inject.Inject
 class ScanImagesUseCase @Inject constructor(
     private val imageRepository: ImageRepository
 ) {
+    private var ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+
+    constructor(
+        imageRepository: ImageRepository,
+        ioDispatcher: CoroutineDispatcher
+    ) : this(imageRepository) {
+        this.ioDispatcher = ioDispatcher
+    }
+
     operator fun invoke(
         scanMode: ScanMode,
         folders: Set<String> = emptySet()
@@ -29,6 +39,7 @@ class ScanImagesUseCase @Inject constructor(
         val computeSimilar = scanMode == ScanMode.EXACT_AND_SIMILAR
 
         if (total == 0) {
+            send(ScanProgress(ScanPhase.HASHING, 0, 0) to emptyList<ImageItem>())
             send(ScanProgress(ScanPhase.COMPLETE, 0, 0) to emptyList<ImageItem>())
             return@channelFlow
         }
@@ -153,7 +164,7 @@ class ScanImagesUseCase @Inject constructor(
         send(
             ScanProgress(ScanPhase.COMPLETE, total, total) to finalImages.toList()
         )
-    }.flowOn(Dispatchers.IO)
+    }.flowOn(ioDispatcher)
 
     companion object {
         private const val PROGRESS_STEP = 20

@@ -22,6 +22,7 @@ class EnsureOverlayModelBundleUseCaseTest {
     @Test
     fun `downloads bundle when missing and download is allowed`() = runBlocking {
         val repository = BaseOverlayModelBundleRepositoryFake().apply {
+            downloadConfigured = true
             downloadResult = Result.success(bundleInfo())
         }
 
@@ -35,6 +36,17 @@ class EnsureOverlayModelBundleUseCaseTest {
         val repository = BaseOverlayModelBundleRepositoryFake()
 
         val result = EnsureOverlayModelBundleUseCase(repository)(allowDownload = false)
+
+        assertEquals(EnsureOverlayModelBundleStatus.MISSING_CONFIGURATION, result.status)
+    }
+
+    @Test
+    fun `returns missing status when download is requested but manifest is not configured`() = runBlocking {
+        val repository = BaseOverlayModelBundleRepositoryFake().apply {
+            downloadConfigured = false
+        }
+
+        val result = EnsureOverlayModelBundleUseCase(repository)(allowDownload = true)
 
         assertEquals(EnsureOverlayModelBundleStatus.MISSING_CONFIGURATION, result.status)
     }

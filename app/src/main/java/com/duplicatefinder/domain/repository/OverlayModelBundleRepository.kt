@@ -12,6 +12,7 @@ data class OverlayModelBundleInfo(
 )
 
 interface OverlayModelBundleRepository {
+    fun isDownloadConfigured(): Boolean
     suspend fun getActiveBundleInfo(): OverlayModelBundleInfo?
     suspend fun ensureBundleAvailable(): OverlayModelBundleInfo?
     suspend fun downloadBundle(): Result<OverlayModelBundleInfo>

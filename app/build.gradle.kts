@@ -5,6 +5,13 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val overlayModelManifestUrl = providers.gradleProperty("overlayModelManifestUrl")
+    .orElse(providers.environmentVariable("OVERLAY_MODEL_MANIFEST_URL"))
+    .orElse("")
+    .get()
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+
 android {
     namespace = "com.duplicatefinder"
     compileSdk = 34
@@ -15,7 +22,7 @@ android {
         targetSdk = 34
         versionCode = 4
         versionName = "1.1.0"
-        buildConfigField("String", "OVERLAY_MODEL_MANIFEST_URL", "\"\"")
+        buildConfigField("String", "OVERLAY_MODEL_MANIFEST_URL", "\"$overlayModelManifestUrl\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -111,6 +118,7 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     testImplementation("org.mockito:mockito-core:5.2.0")
     testImplementation("org.mockito:mockito-inline:5.2.0")
+    testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.02.00"))

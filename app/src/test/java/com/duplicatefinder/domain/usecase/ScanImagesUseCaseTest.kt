@@ -7,6 +7,7 @@ import com.duplicatefinder.domain.model.ScanMode
 import com.duplicatefinder.domain.model.ScanPhase
 import com.duplicatefinder.domain.testImage
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -20,7 +21,7 @@ class ScanImagesUseCaseTest {
         val repo = object : BaseImageRepositoryFake() {
             override suspend fun getImageCount(folders: Set<String>): Int = 0
         }
-        val useCase = ScanImagesUseCase(repo)
+        val useCase = ScanImagesUseCase(repo, StandardTestDispatcher(testScheduler))
 
         val emissions = useCase(ScanMode.EXACT).toList()
 
@@ -59,7 +60,7 @@ class ScanImagesUseCaseTest {
                 savedUpdates = updates
             }
         }
-        val useCase = ScanImagesUseCase(repo)
+        val useCase = ScanImagesUseCase(repo, StandardTestDispatcher(testScheduler))
 
         val emissions = useCase(ScanMode.EXACT).toList()
         val finalImages = emissions.last().second

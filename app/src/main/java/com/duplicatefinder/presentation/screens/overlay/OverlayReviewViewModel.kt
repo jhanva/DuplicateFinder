@@ -1,5 +1,6 @@
 package com.duplicatefinder.presentation.screens.overlay
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.duplicatefinder.domain.model.OverlayPreviewDecision
@@ -14,6 +15,7 @@ import com.duplicatefinder.domain.usecase.MoveToTrashUseCase
 import com.duplicatefinder.domain.usecase.ScanOverlayCandidatesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -308,15 +310,27 @@ class OverlayReviewViewModel @Inject constructor(
         val current = state.currentItem ?: return
 
         viewModelScope.launch {
+            val currentImage = imageRepository.getImageById(current.image.id)
+            if (currentImage == null) {
+                applyOverlayPreviewDecisionUseCase.discardPreview(preview)
+                _uiState.update {
+                    it.copy(
+                        previewState = null,
+                        error = "The image changed or no longer exists. The temporary preview was discarded."
+                    )
+                }
+                return@launch
+            }
+
             applyOverlayPreviewDecisionUseCase(
-                image = current.image,
+                image = currentImage,
                 preview = preview,
                 decision = decision
             ).onSuccess {
                 _uiState.update { currentState ->
                     when (decision) {
                         OverlayPreviewDecision.KEEP_CLEANED_REPLACE_ORIGINAL -> {
-                            val cleaned = currentState.completedCleanReplaceIds + current.image.id
+                            val cleaned = currentState.completedCleanReplaceIds + currentImage.id
                             currentState.copy(
                                 previewState = null,
                                 completedCleanReplaceIds = cleaned,
@@ -333,16 +347,16 @@ class OverlayReviewViewModel @Inject constructor(
                         }
 
                         OverlayPreviewDecision.DELETE_ALL -> {
-                            val moved = currentState.movedToTrashIds + current.image.id
+                            val moved = currentState.movedToTrashIds + currentImage.id
                             currentState.copy(
                                 previewState = null,
                                 movedToTrashIds = moved,
-                                markedForTrashIds = currentState.markedForTrashIds - current.image.id,
+                                markedForTrashIds = currentState.markedForTrashIds - currentImage.id,
                                 currentIndex = nextUndecidedIndex(
                                     items = currentState.filteredOverlayItems,
                                     start = (currentState.currentIndex + 1).coerceAtLeast(0),
                                     kept = currentState.keptImageIds,
-                                    marked = currentState.markedForTrashIds - current.image.id,
+                                    marked = currentState.markedForTrashIds - currentImage.id,
                                     moved = moved,
                                     cleaned = currentState.completedCleanReplaceIds,
                                     skipped = currentState.skippedPreviewIds
@@ -351,7 +365,7 @@ class OverlayReviewViewModel @Inject constructor(
                         }
 
                         OverlayPreviewDecision.SKIP_KEEP_ORIGINAL -> {
-                            val skipped = currentState.skippedPreviewIds + current.image.id
+                            val skipped = currentState.skippedPreviewIds + currentImage.id
                             currentState.copy(
                                 previewState = null,
                                 skippedPreviewIds = skipped,
@@ -493,8 +507,23 @@ class OverlayReviewViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        super.onCleared()
         scanJob?.cancel()
+        discardPreviewFiles(_uiState.value.previewState)
+        super.onCleared()
+    }
+
+    private fun discardPreviewFiles(preview: com.duplicatefinder.domain.model.CleaningPreview?) {
+        preview ?: return
+        deletePreviewUri(preview.previewUri)
+        preview.maskUri?.let(::deletePreviewUri)
+    }
+
+    private fun deletePreviewUri(uri: Uri) {
+        if (uri.scheme == null || uri.scheme == "file") {
+            uri.path?.let { path ->
+                File(path).takeIf { it.exists() }?.delete()
+            }
+        }
     }
 }
 

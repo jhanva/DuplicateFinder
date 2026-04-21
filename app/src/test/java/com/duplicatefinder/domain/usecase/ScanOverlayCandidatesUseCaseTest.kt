@@ -5,7 +5,8 @@ import com.duplicatefinder.domain.BaseOverlayRepositoryFake
 import com.duplicatefinder.domain.testImage
 import com.duplicatefinder.domain.testOverlayDetection
 import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -13,7 +14,7 @@ import org.junit.Test
 class ScanOverlayCandidatesUseCaseTest {
 
     @Test
-    fun `scan emits candidates sorted by refined score descending`() = runBlocking {
+    fun `scan emits candidates sorted by refined score descending`() = runTest {
         val images = listOf(
             testImage(id = 1, size = 100),
             testImage(id = 2, size = 200),
@@ -38,7 +39,11 @@ class ScanOverlayCandidatesUseCaseTest {
             )
         }
 
-        val states = ScanOverlayCandidatesUseCase(imageRepository, overlayRepository)
+        val states = ScanOverlayCandidatesUseCase(
+            imageRepository,
+            overlayRepository,
+            StandardTestDispatcher(testScheduler)
+        )
             .invoke(folders = setOf("Camera"), reviewThreshold = 0.0f)
             .toList()
 
@@ -46,7 +51,7 @@ class ScanOverlayCandidatesUseCaseTest {
     }
 
     @Test
-    fun `scan reuses cached detections when cache is still valid`() = runBlocking {
+    fun `scan reuses cached detections when cache is still valid`() = runTest {
         val images = listOf(testImage(id = 1, size = 100))
         val cached = testOverlayDetection(images.first())
         val imageRepository = object : BaseImageRepositoryFake() {
@@ -64,7 +69,11 @@ class ScanOverlayCandidatesUseCaseTest {
             ) = mapOf(cached.image.id to cached)
         }
 
-        ScanOverlayCandidatesUseCase(imageRepository, overlayRepository)
+        ScanOverlayCandidatesUseCase(
+            imageRepository,
+            overlayRepository,
+            StandardTestDispatcher(testScheduler)
+        )
             .invoke(folders = setOf("Camera"))
             .toList()
 
@@ -72,7 +81,7 @@ class ScanOverlayCandidatesUseCaseTest {
     }
 
     @Test
-    fun `scan excludes items below review threshold`() = runBlocking {
+    fun `scan excludes items below review threshold`() = runTest {
         val images = listOf(
             testImage(id = 1, size = 100),
             testImage(id = 2, size = 200)
@@ -95,7 +104,11 @@ class ScanOverlayCandidatesUseCaseTest {
             )
         }
 
-        val states = ScanOverlayCandidatesUseCase(imageRepository, overlayRepository)
+        val states = ScanOverlayCandidatesUseCase(
+            imageRepository,
+            overlayRepository,
+            StandardTestDispatcher(testScheduler)
+        )
             .invoke(folders = setOf("Camera"), reviewThreshold = 0.60f)
             .toList()
 

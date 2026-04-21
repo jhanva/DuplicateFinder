@@ -70,6 +70,8 @@ class OverlayReviewViewModelTest {
                 limit: Int,
                 offset: Int
             ) = listOf(image)
+            override suspend fun getImageById(id: Long) = image.takeIf { it.id == id }
+            override suspend fun getImagesByIds(ids: List<Long>) = listOf(image).filter { it.id in ids }
         }
         val overlayRepository = object : BaseOverlayRepositoryFake() {
             override suspend fun detectOverlayCandidates(
@@ -100,6 +102,8 @@ class OverlayReviewViewModelTest {
                 limit: Int,
                 offset: Int
             ) = listOf(image)
+            override suspend fun getImageById(id: Long) = image.takeIf { it.id == id }
+            override suspend fun getImagesByIds(ids: List<Long>) = listOf(image).filter { it.id in ids }
         }
         val overlayRepository = object : BaseOverlayRepositoryFake() {
             override suspend fun detectOverlayCandidates(
@@ -117,6 +121,7 @@ class OverlayReviewViewModelTest {
         viewModel.generatePreviewForCurrent()
         advanceUntilIdle()
         viewModel.skipPreview()
+        advanceUntilIdle()
 
         assertEquals(setOf(image.id), viewModel.uiState.value.skippedPreviewIds)
     }
@@ -131,6 +136,8 @@ class OverlayReviewViewModelTest {
                 limit: Int,
                 offset: Int
             ) = listOf(image)
+            override suspend fun getImageById(id: Long) = image.takeIf { it.id == id }
+            override suspend fun getImagesByIds(ids: List<Long>) = listOf(image).filter { it.id in ids }
         }
         val overlayRepository = object : BaseOverlayRepositoryFake() {
             override suspend fun detectOverlayCandidates(
@@ -148,6 +155,7 @@ class OverlayReviewViewModelTest {
         viewModel.generatePreviewForCurrent()
         advanceUntilIdle()
         viewModel.keepCleanedPreview()
+        advanceUntilIdle()
 
         assertEquals(setOf(image.id), viewModel.uiState.value.completedCleanReplaceIds)
     }
@@ -177,7 +185,8 @@ class OverlayReviewViewModelTest {
             imageRepository = imageRepository,
             scanOverlayCandidatesUseCase = ScanOverlayCandidatesUseCase(
                 imageRepository,
-                overlayRepository
+                overlayRepository,
+                dispatcher
             ),
             generateOverlayPreviewUseCase = GenerateOverlayPreviewUseCase(
                 ensureOverlayModelBundleUseCase = EnsureOverlayModelBundleUseCase(bundleRepository),

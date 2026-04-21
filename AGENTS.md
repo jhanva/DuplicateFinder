@@ -5,6 +5,14 @@
 - Do not use emojis in source code, comments, documentation, commit messages, or PR descriptions.
 - Use plain, professional text only.
 
+## Shared Codex Skills
+
+- This repository exposes shared Codex skills through `.agents/skills/` and shared custom agents through `.codex/agents/`.
+- In this working copy, both directories are linked to the sibling repository `../ai-skills`.
+- Treat `../ai-skills` as the source of truth for shared skill content unless the user explicitly asks for a repo-specific override here.
+- `.codex/config.toml` is copied locally so this repository can keep its own Codex project settings if needed.
+- If the shared repository moves or the links are missing, recreate them with `scripts/setup-shared-codex-skills.ps1`.
+
 ## Branching And Release Flow
 
 This repository uses a single-branch delivery model centered on `main`.

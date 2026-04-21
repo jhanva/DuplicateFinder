@@ -18,12 +18,15 @@ class OverlayModelBundleRepositoryImpl @Inject constructor(
     @Named("overlayModelBundleDir") private val bundleDir: File
 ) : OverlayModelBundleRepository {
 
+    override fun isDownloadConfigured(): Boolean = manifestUrl.isNotBlank()
+
     override suspend fun getActiveBundleInfo(): OverlayModelBundleInfo? = withContext(Dispatchers.IO) {
         val manifestFile = File(bundleDir, MANIFEST_FILE_NAME)
         if (!manifestFile.exists()) return@withContext null
 
         runCatching {
             manifestFile.readText().toBundleInfo(manifestUrl)
+                .takeIf(::isBundleComplete)
         }.getOrNull()
     }
 
@@ -42,22 +45,36 @@ class OverlayModelBundleRepositoryImpl @Inject constructor(
             bundleDir.mkdirs()
             val manifestJson = downloadText(manifestUrl)
             val bundleInfo = manifestJson.toBundleInfo(manifestUrl)
+            val writtenFiles = mutableListOf<File>()
 
-            File(bundleDir, MANIFEST_FILE_NAME).writeText(manifestJson)
-            downloadAsset(bundleInfo.detectorStage1Path)
-            downloadAsset(bundleInfo.detectorStage2Path)
-            downloadAsset(bundleInfo.inpainterPath)
+            try {
+                writtenFiles += downloadAsset(bundleInfo.detectorStage1Path)
+                writtenFiles += downloadAsset(bundleInfo.detectorStage2Path)
+                writtenFiles += downloadAsset(bundleInfo.inpainterPath)
+
+                if (!isBundleComplete(bundleInfo)) {
+                    throw IllegalStateException("Overlay model bundle is incomplete after download.")
+                }
+
+                File(bundleDir, MANIFEST_FILE_NAME).writeText(manifestJson)
+            } catch (error: Exception) {
+                writtenFiles.forEach { it.delete() }
+                File(bundleDir, MANIFEST_FILE_NAME).delete()
+                throw error
+            }
             bundleInfo
         }
     }
 
-    private fun downloadAsset(path: String) {
+    private fun downloadAsset(path: String): File {
         val source = if (path.startsWith("http://") || path.startsWith("https://")) {
             path
         } else {
             URL(URL(manifestUrl), path).toString()
         }
         val target = File(bundleDir, path.substringAfterLast('/'))
+        val tempTarget = File(target.parentFile, "${target.name}.part")
+
         URL(source).openConnection().let { connection ->
             connection as HttpURLConnection
             connection.connectTimeout = CONNECTION_TIMEOUT_MS
@@ -67,11 +84,24 @@ class OverlayModelBundleRepositoryImpl @Inject constructor(
             if (connection.responseCode !in 200..299) {
                 throw IllegalStateException("Failed to download overlay asset: $source")
             }
-            target.outputStream().use { output ->
+            tempTarget.outputStream().use { output ->
                 connection.inputStream.use { input -> input.copyTo(output) }
             }
             connection.disconnect()
         }
+        if (tempTarget.length() <= 0L) {
+            tempTarget.delete()
+            throw IllegalStateException("Downloaded overlay asset is empty: $source")
+        }
+        if (target.exists() && !target.delete()) {
+            tempTarget.delete()
+            throw IllegalStateException("Failed to replace existing overlay asset: ${target.name}")
+        }
+        if (!tempTarget.renameTo(target)) {
+            tempTarget.delete()
+            throw IllegalStateException("Failed to finalize overlay asset download: ${target.name}")
+        }
+        return target
     }
 
     private fun downloadText(url: String): String {
@@ -102,6 +132,19 @@ class OverlayModelBundleRepositoryImpl @Inject constructor(
             inputSizeInpainter = json.optInt("inputSizeInpainter", 1024),
             manifestUrl = defaultManifestUrl
         )
+    }
+
+    private fun isBundleComplete(bundleInfo: OverlayModelBundleInfo): Boolean {
+        val requiredFiles = listOf(
+            bundleInfo.detectorStage1Path,
+            bundleInfo.detectorStage2Path,
+            bundleInfo.inpainterPath
+        )
+        return requiredFiles.all { path ->
+            File(bundleDir, path.substringAfterLast('/')).let { file ->
+                file.exists() && file.length() > 0L
+            }
+        }
     }
 
     companion object {

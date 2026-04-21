@@ -21,4 +21,8 @@ class ApplyOverlayPreviewDecisionUseCase @Inject constructor(
             decision = decision
         )
     }
+
+    suspend fun discardPreview(preview: CleaningPreview): Result<Unit> {
+        return overlayCleaningRepository.discardPreview(preview)
+    }
 }

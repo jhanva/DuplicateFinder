@@ -4,6 +4,7 @@ import com.duplicatefinder.domain.BaseImageRepositoryFake
 import com.duplicatefinder.domain.model.ScanPhase
 import com.duplicatefinder.domain.testImage
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -27,7 +28,10 @@ class ScanResolutionImagesUseCaseTest {
             ) = allImages.drop(offset).take(limit)
         }
 
-        val emissions = ScanResolutionImagesUseCase(repo)(setOf("Camera")).toList()
+        val emissions = ScanResolutionImagesUseCase(
+            repo,
+            StandardTestDispatcher(testScheduler)
+        )(setOf("Camera")).toList()
 
         assertEquals(5, emissions.size)
         assertEquals(ScanPhase.LOADING, emissions[0].progress.phase)
@@ -58,7 +62,10 @@ class ScanResolutionImagesUseCaseTest {
             ) = allImages.drop(offset).take(limit)
         }
 
-        val emissions = ScanResolutionImagesUseCase(repo)(setOf("Camera")).toList()
+        val emissions = ScanResolutionImagesUseCase(
+            repo,
+            StandardTestDispatcher(testScheduler)
+        )(setOf("Camera")).toList()
 
         assertEquals(listOf(valid.id), emissions.last().items.map { it.image.id })
         assertEquals(2, emissions.last().progress.current)

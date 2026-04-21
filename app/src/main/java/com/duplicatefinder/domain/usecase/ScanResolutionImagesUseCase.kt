@@ -5,6 +5,7 @@ import com.duplicatefinder.domain.model.ResolutionScanState
 import com.duplicatefinder.domain.model.ScanPhase
 import com.duplicatefinder.domain.model.ScanProgress
 import com.duplicatefinder.domain.repository.ImageRepository
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -14,6 +15,15 @@ import javax.inject.Inject
 class ScanResolutionImagesUseCase @Inject constructor(
     private val imageRepository: ImageRepository
 ) {
+    private var ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+
+    constructor(
+        imageRepository: ImageRepository,
+        ioDispatcher: CoroutineDispatcher
+    ) : this(imageRepository) {
+        this.ioDispatcher = ioDispatcher
+    }
+
 
     operator fun invoke(
         folders: Set<String>
@@ -96,7 +106,7 @@ class ScanResolutionImagesUseCase @Inject constructor(
                 items = finalItems.sortedBy { it.pixelCount }
             )
         )
-    }.flowOn(Dispatchers.IO)
+    }.flowOn(ioDispatcher)
 
     companion object {
         private const val BATCH_SIZE = 500

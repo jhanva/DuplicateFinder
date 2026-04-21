@@ -45,7 +45,7 @@ class ResolutionReviewViewModelTest {
         val viewModel = ResolutionReviewViewModel(
             settingsRepository = settingsRepository,
             imageRepository = imageRepository,
-            scanResolutionImagesUseCase = ScanResolutionImagesUseCase(imageRepository),
+            scanResolutionImagesUseCase = ScanResolutionImagesUseCase(imageRepository, dispatcher),
             moveToTrashUseCase = MoveToTrashUseCase(object : BaseTrashRepositoryFake() {})
         )
 
@@ -172,7 +172,7 @@ class ResolutionReviewViewModelTest {
         return ResolutionReviewViewModel(
             settingsRepository = settingsRepository,
             imageRepository = imageRepository,
-            scanResolutionImagesUseCase = ScanResolutionImagesUseCase(imageRepository),
+            scanResolutionImagesUseCase = ScanResolutionImagesUseCase(imageRepository, dispatcher),
             moveToTrashUseCase = MoveToTrashUseCase(object : BaseTrashRepositoryFake() {})
         )
     }

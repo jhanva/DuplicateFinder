@@ -19,6 +19,12 @@ class EnsureOverlayModelBundleUseCase @Inject constructor(
             )
         }
 
+        if (!bundleRepository.isDownloadConfigured()) {
+            return EnsureOverlayModelBundleResult(
+                status = EnsureOverlayModelBundleStatus.MISSING_CONFIGURATION
+            )
+        }
+
         if (!allowDownload) {
             return EnsureOverlayModelBundleResult(
                 status = EnsureOverlayModelBundleStatus.MISSING_CONFIGURATION

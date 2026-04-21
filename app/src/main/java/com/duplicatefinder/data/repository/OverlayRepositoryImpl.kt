@@ -1,5 +1,7 @@
 package com.duplicatefinder.data.repository
 
+import android.content.Context
+import android.graphics.BitmapFactory
 import com.duplicatefinder.data.local.db.dao.OverlayDetectionDao
 import com.duplicatefinder.data.local.db.entities.OverlayDetectionEntity
 import com.duplicatefinder.data.media.MediaStoreDataSource
@@ -9,16 +11,19 @@ import com.duplicatefinder.domain.model.OverlayDetection
 import com.duplicatefinder.domain.model.OverlayKind
 import com.duplicatefinder.domain.model.OverlayRegion
 import com.duplicatefinder.domain.repository.OverlayRepository
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class OverlayRepositoryImpl @Inject constructor(
     private val overlayDetectionDao: OverlayDetectionDao,
+    @ApplicationContext private val context: Context,
     private val mediaStoreDataSource: MediaStoreDataSource
 ) : OverlayRepository {
 
@@ -76,118 +81,58 @@ class OverlayRepositoryImpl @Inject constructor(
         image: ImageItem,
         modelVersion: String
     ): OverlayDetection {
-        val normalizedName = image.name.lowercase()
-        val normalizedPath = image.path.lowercase()
-        val keywords = linkedMapOf(
-            OverlayKind.HANDLE to listOf("@"),
-            OverlayKind.SIGNATURE to listOf("sign", "firma", "signed"),
-            OverlayKind.LOGO to listOf("logo", "watermark", "wm"),
-            OverlayKind.DATE_STAMP to listOf("date", "timestamp"),
-            OverlayKind.CAPTION to listOf("meme", "caption", "quote"),
-            OverlayKind.STICKER_TEXT to listOf("sticker"),
-            OverlayKind.TEXT to listOf("text")
-        )
-
-        val matchedKinds = keywords
-            .filterValues { tokens ->
-                tokens.any { token ->
-                    normalizedName.contains(token) || normalizedPath.contains(token)
-                }
-            }
-            .keys
-            .ifEmpty { setOf(OverlayKind.UNKNOWN) }
-
-        val keywordHits = matchedKinds.size
-        val preliminaryScore = (
-            0.1f +
-                (keywordHits * 0.18f) +
-                scoreForDimensions(image)
-            ).coerceIn(0f, 1f)
-        val refinedScore = (
-            preliminaryScore +
-                scoreForAspectRatio(image) +
-                if (OverlayKind.HANDLE in matchedKinds) 0.1f else 0f
-            ).coerceIn(0f, 1f)
-        val coverage = coverageForKinds(matchedKinds).coerceIn(0.02f, 0.45f)
-        val regions = buildRegions(matchedKinds, refinedScore)
+        val analysis = runCatching { analyzeImageContent(image) }.getOrDefault(OverlayImageAnalysis.analyze(
+            pixels = IntArray(MIN_ANALYSIS_DIMENSION * MIN_ANALYSIS_DIMENSION) { DEFAULT_PIXEL },
+            width = MIN_ANALYSIS_DIMENSION,
+            height = MIN_ANALYSIS_DIMENSION
+        ))
 
         return OverlayDetection(
             image = image,
-            preliminaryScore = preliminaryScore,
-            refinedScore = refinedScore,
-            overlayCoverageRatio = coverage,
-            maskBounds = regions,
-            maskConfidence = refinedScore,
-            overlayKinds = matchedKinds,
-            stage = if (refinedScore > preliminaryScore) {
-                DetectionStage.STAGE_2_REFINED
-            } else {
-                DetectionStage.STAGE_1_CANDIDATE
-            },
+            preliminaryScore = analysis.preliminaryScore,
+            refinedScore = analysis.refinedScore,
+            overlayCoverageRatio = analysis.overlayCoverageRatio,
+            maskBounds = analysis.regions,
+            maskConfidence = analysis.maskConfidence,
+            overlayKinds = analysis.overlayKinds,
+            stage = analysis.stage,
             modelVersion = modelVersion
         )
     }
 
-    private fun scoreForDimensions(image: ImageItem): Float {
-        val megapixels = (image.width * image.height) / 1_000_000f
-        return when {
-            megapixels >= 10f -> 0.08f
-            megapixels >= 4f -> 0.04f
-            else -> 0f
-        }
+    private fun analyzeImageContent(image: ImageItem): OverlayAnalysisResult {
+        val bitmap = decodeAnalysisBitmap(image)
+            ?: throw IOException("Unable to decode bitmap for overlay analysis.")
+        val pixels = IntArray(bitmap.width * bitmap.height)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        return OverlayImageAnalysis.analyze(
+            pixels = pixels,
+            width = bitmap.width,
+            height = bitmap.height
+        )
     }
 
-    private fun scoreForAspectRatio(image: ImageItem): Float {
-        if (image.width == 0 || image.height == 0) return 0f
-        val ratio = image.width.toFloat() / image.height.toFloat()
-        return if (ratio > 1.7f || ratio < 0.6f) 0.05f else 0f
-    }
+    private fun decodeAnalysisBitmap(image: ImageItem) = context.contentResolver.openInputStream(image.uri)?.use { stream ->
+        val bounds = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        BitmapFactory.decodeStream(stream, null, bounds)
 
-    private fun coverageForKinds(kinds: Set<OverlayKind>): Float {
-        return when {
-            OverlayKind.CAPTION in kinds || OverlayKind.STICKER_TEXT in kinds -> 0.35f
-            OverlayKind.LOGO in kinds || OverlayKind.SIGNATURE in kinds -> 0.12f
-            OverlayKind.HANDLE in kinds || OverlayKind.DATE_STAMP in kinds -> 0.08f
-            else -> 0.05f
+        val maxDimension = maxOf(bounds.outWidth, bounds.outHeight)
+        var sampleSize = 1
+        while ((maxDimension / sampleSize) > MAX_ANALYSIS_DIMENSION) {
+            sampleSize *= 2
         }
-    }
-
-    private fun buildRegions(
-        kinds: Set<OverlayKind>,
-        confidence: Float
-    ): List<OverlayRegion> {
-        val regions = mutableListOf<OverlayRegion>()
-        if (OverlayKind.CAPTION in kinds || OverlayKind.STICKER_TEXT in kinds) {
-            regions += OverlayRegion(
-                left = 0.05f,
-                top = 0.72f,
-                right = 0.95f,
-                bottom = 0.94f,
-                confidence = confidence,
-                kind = OverlayKind.CAPTION
+        context.contentResolver.openInputStream(image.uri)?.use { decodeStream ->
+            BitmapFactory.decodeStream(
+                decodeStream,
+                null,
+                BitmapFactory.Options().apply {
+                    inSampleSize = sampleSize.coerceAtLeast(1)
+                    inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888
+                }
             )
         }
-        if (OverlayKind.HANDLE in kinds || OverlayKind.DATE_STAMP in kinds) {
-            regions += OverlayRegion(
-                left = 0.6f,
-                top = 0.02f,
-                right = 0.95f,
-                bottom = 0.16f,
-                confidence = confidence,
-                kind = if (OverlayKind.HANDLE in kinds) OverlayKind.HANDLE else OverlayKind.DATE_STAMP
-            )
-        }
-        if (regions.isEmpty()) {
-            regions += OverlayRegion(
-                left = 0.7f,
-                top = 0.78f,
-                right = 0.95f,
-                bottom = 0.94f,
-                confidence = confidence,
-                kind = kinds.firstOrNull() ?: OverlayKind.UNKNOWN
-            )
-        }
-        return regions
     }
 
     private fun encodeRegions(regions: List<OverlayRegion>): String {
@@ -254,5 +199,11 @@ class OverlayRepositoryImpl @Inject constructor(
             },
             modelVersion = modelVersion
         )
+    }
+
+    companion object {
+        private const val MAX_ANALYSIS_DIMENSION = 384
+        private const val MIN_ANALYSIS_DIMENSION = 16
+        private const val DEFAULT_PIXEL = -9671572
     }
 }
