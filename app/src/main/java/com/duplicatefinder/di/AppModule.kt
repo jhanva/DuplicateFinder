@@ -3,6 +3,7 @@ package com.duplicatefinder.di
 import android.content.Intent
 import android.content.Context
 import android.os.Build
+import com.duplicatefinder.R
 import com.duplicatefinder.BuildConfig
 import com.duplicatefinder.data.local.datastore.SettingsDataStore
 import com.duplicatefinder.data.media.MediaStoreDataSource
@@ -85,11 +86,36 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideSamsungGalleryEditIntentFactory(
+    @Named("overlaySamsungGalleryRequiredMessage")
+    fun provideOverlaySamsungGalleryRequiredMessage(
         @ApplicationContext context: Context
+    ): String = context.getString(R.string.overlay_samsung_gallery_required)
+
+    @Provides
+    @Singleton
+    @Named("overlaySamsungGalleryAdvisoryMessage")
+    fun provideOverlaySamsungGalleryAdvisoryMessage(
+        @ApplicationContext context: Context
+    ): String = context.getString(R.string.overlay_samsung_gallery_advisory)
+
+    @Provides
+    @Singleton
+    @Named("overlayNoGalleryChangesMessage")
+    fun provideOverlayNoGalleryChangesMessage(
+        @ApplicationContext context: Context
+    ): String = context.getString(R.string.overlay_no_gallery_changes)
+
+    @Provides
+    @Singleton
+    fun provideSamsungGalleryEditIntentFactory(
+        @ApplicationContext context: Context,
+        @Named("overlaySamsungGalleryRequiredMessage") requiredMessage: String,
+        @Named("overlaySamsungGalleryAdvisoryMessage") advisoryMessage: String
     ): SamsungGalleryEditIntentFactory {
         return SamsungGalleryEditIntentFactory(
             deviceManufacturer = Build.MANUFACTURER,
+            requiredMessage = requiredMessage,
+            advisoryMessage = advisoryMessage,
             canResolveEditIntent = { intent: Intent ->
                 intent.resolveActivity(context.packageManager) != null
             }

@@ -5,11 +5,13 @@ import com.duplicatefinder.domain.model.ImageItem
 
 data class SamsungGalleryEditAvailability(
     val enabled: Boolean,
-    val reason: String? = null
+    val helperText: String? = null
 )
 
 class SamsungGalleryEditIntentFactory(
     private val deviceManufacturer: String,
+    private val requiredMessage: String,
+    private val advisoryMessage: String,
     private val canResolveEditIntent: (Intent) -> Boolean
 ) {
 
@@ -17,16 +19,19 @@ class SamsungGalleryEditIntentFactory(
         if (!deviceManufacturer.equals(SAMSUNG_MANUFACTURER, ignoreCase = true)) {
             return SamsungGalleryEditAvailability(
                 enabled = false,
-                reason = REQUIRES_SAMSUNG_GALLERY_REASON
+                helperText = requiredMessage
             )
         }
 
         return if (canResolveEditIntent(createIntent(image))) {
-            SamsungGalleryEditAvailability(enabled = true)
+            SamsungGalleryEditAvailability(
+                enabled = true,
+                helperText = advisoryMessage
+            )
         } else {
             SamsungGalleryEditAvailability(
                 enabled = false,
-                reason = REQUIRES_SAMSUNG_GALLERY_REASON
+                helperText = requiredMessage
             )
         }
     }
@@ -40,8 +45,6 @@ class SamsungGalleryEditIntentFactory(
 
     companion object {
         const val SAMSUNG_GALLERY_PACKAGE = "com.sec.android.gallery3d"
-        const val REQUIRES_SAMSUNG_GALLERY_REASON =
-            "Requires Samsung Gallery AI editing on a supported Samsung device."
 
         private const val SAMSUNG_MANUFACTURER = "samsung"
     }

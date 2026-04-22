@@ -266,7 +266,8 @@ private fun LoadedOverlayReviewState(
                             totalCount = state.totalCount,
                             pendingBatchCount = state.pendingBatchCount,
                             isPaused = state.isPaused,
-                            samsungGalleryDisabledReason = state.samsungGalleryDisabledReason,
+                            canOpenInSamsungGallery = state.canOpenInSamsungGallery,
+                            samsungGalleryHelperText = state.samsungGalleryHelperText,
                             onKeep = onKeep,
                             onMarkForTrash = onMarkForTrash,
                             onApplyBatch = onApplyBatch,
@@ -365,13 +366,14 @@ private fun OverlayReviewContent(
     totalCount: Int,
     pendingBatchCount: Int,
     isPaused: Boolean,
-    samsungGalleryDisabledReason: String?,
+    canOpenInSamsungGallery: Boolean,
+    samsungGalleryHelperText: String?,
     onKeep: () -> Unit,
     onMarkForTrash: () -> Unit,
     onApplyBatch: () -> Unit,
     onOpenInSamsungGallery: () -> Unit
 ) {
-    val isSamsungGalleryEnabled = !isPaused && samsungGalleryDisabledReason == null
+    val isSamsungGalleryEnabled = !isPaused && canOpenInSamsungGallery
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -506,10 +508,10 @@ private fun OverlayReviewContent(
             Text(stringResource(R.string.overlay_open_in_samsung_gallery))
         }
 
-        if (samsungGalleryDisabledReason != null) {
+        if (samsungGalleryHelperText != null) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = samsungGalleryDisabledReason,
+                text = samsungGalleryHelperText,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center

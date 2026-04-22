@@ -8,34 +8,53 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SamsungGalleryEditIntentFactoryTest {
+    private val requiredMessage = "Requires Samsung Gallery AI editing on a supported Samsung device."
+    private val advisoryMessage =
+        "Opens Samsung Gallery. Object Eraser availability depends on your device and Gallery version."
 
     @Test
-    fun `availability is enabled only for samsung gallery on samsung devices`() {
+    fun `availability includes advisory note on supported samsung devices`() {
         val factory = SamsungGalleryEditIntentFactory(
             deviceManufacturer = "samsung",
+            requiredMessage = requiredMessage,
+            advisoryMessage = advisoryMessage,
             canResolveEditIntent = { true }
         )
 
         val availability = factory.availabilityFor(testImage(id = 1, size = 100))
 
         assertTrue(availability.enabled)
-        assertEquals(null, availability.reason)
+        assertEquals(advisoryMessage, availability.helperText)
     }
 
     @Test
     fun `availability is disabled on non samsung devices`() {
         val factory = SamsungGalleryEditIntentFactory(
             deviceManufacturer = "google",
+            requiredMessage = requiredMessage,
+            advisoryMessage = advisoryMessage,
             canResolveEditIntent = { true }
         )
 
         val availability = factory.availabilityFor(testImage(id = 1, size = 100))
 
         assertFalse(availability.enabled)
-        assertEquals(
-            "Requires Samsung Gallery AI editing on a supported Samsung device.",
-            availability.reason
+        assertEquals(requiredMessage, availability.helperText)
+    }
+
+    @Test
+    fun `availability is disabled when samsung gallery cannot resolve edit intent`() {
+        val factory = SamsungGalleryEditIntentFactory(
+            deviceManufacturer = "samsung",
+            requiredMessage = requiredMessage,
+            advisoryMessage = advisoryMessage,
+            canResolveEditIntent = { false }
         )
+
+        val availability = factory.availabilityFor(testImage(id = 1, size = 100))
+
+        assertFalse(availability.enabled)
+        assertEquals(requiredMessage, availability.helperText)
     }
 
     @Test
@@ -43,6 +62,8 @@ class SamsungGalleryEditIntentFactoryTest {
         val image = testImage(id = 1, size = 100)
         val factory = SamsungGalleryEditIntentFactory(
             deviceManufacturer = "samsung",
+            requiredMessage = requiredMessage,
+            advisoryMessage = advisoryMessage,
             canResolveEditIntent = { true }
         )
 

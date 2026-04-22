@@ -22,7 +22,8 @@ data class OverlayReviewUiState(
     val pendingDeleteIntentSender: IntentSender? = null,
     val externalEditSession: OverlayExternalEditSession? = null,
     val pendingExternalEditIntent: Intent? = null,
-    val samsungGalleryDisabledReason: String? = null,
+    val canOpenInSamsungGallery: Boolean = false,
+    val samsungGalleryHelperText: String? = null,
     val requiresFolderSelection: Boolean = false,
     val error: String? = null
 ) {

@@ -51,6 +51,20 @@ class OverlayReviewUiStateTest {
         assertEquals(1, state.editedInGalleryCount)
     }
 
+    @Test
+    fun `gallery helper text can coexist with enabled action`() {
+        val state = OverlayReviewUiState(
+            canOpenInSamsungGallery = true,
+            samsungGalleryHelperText = "Opens Samsung Gallery. Object Eraser availability depends on your device and Gallery version."
+        )
+
+        assertTrue(state.canOpenInSamsungGallery)
+        assertEquals(
+            "Opens Samsung Gallery. Object Eraser availability depends on your device and Gallery version.",
+            state.samsungGalleryHelperText
+        )
+    }
+
     private fun overlayItem(id: Long, score: Float): OverlayReviewItem {
         val image = testImage(id = id, size = id * 100)
         return OverlayReviewItem(

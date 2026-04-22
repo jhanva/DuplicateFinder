@@ -11,7 +11,9 @@ import com.duplicatefinder.domain.usecase.MoveToTrashUseCase
 import com.duplicatefinder.domain.usecase.ScanOverlayCandidatesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import javax.inject.Named
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,6 +27,8 @@ class OverlayReviewViewModel @Inject constructor(
     private val imageRepository: ImageRepository,
     private val scanOverlayCandidatesUseCase: ScanOverlayCandidatesUseCase,
     private val samsungGalleryEditIntentFactory: SamsungGalleryEditIntentFactory,
+    @Named("overlayNoGalleryChangesMessage")
+    private val noGalleryChangesMessage: String,
     private val moveToTrashUseCase: MoveToTrashUseCase
 ) : ViewModel() {
 
@@ -57,7 +61,8 @@ class OverlayReviewViewModel @Inject constructor(
                         pendingDeleteIntentSender = null,
                         externalEditSession = null,
                         pendingExternalEditIntent = null,
-                        samsungGalleryDisabledReason = null
+                        canOpenInSamsungGallery = false,
+                        samsungGalleryHelperText = null
                     )
                 }
 
@@ -193,7 +198,7 @@ class OverlayReviewViewModel @Inject constructor(
         if (!availability.enabled) {
             _uiState.update {
                 withSamsungGalleryAvailability(
-                    it.copy(error = availability.reason ?: "Samsung Gallery is not available.")
+                    it.copy(error = availability.helperText ?: "Samsung Gallery is not available.")
                 )
             }
             return
@@ -223,7 +228,7 @@ class OverlayReviewViewModel @Inject constructor(
         val session = _uiState.value.externalEditSession ?: return
 
         viewModelScope.launch {
-            val latestImage = imageRepository.getImageById(session.imageId)
+            val latestImage = awaitExternalEditResult(session)
             _uiState.update { current ->
                 if (latestImage == null) {
                     withSamsungGalleryAvailability(
@@ -268,7 +273,7 @@ class OverlayReviewViewModel @Inject constructor(
                                 overlayItems = updatedItems,
                                 externalEditSession = null,
                                 pendingExternalEditIntent = null,
-                                error = "No changes were detected in Samsung Gallery."
+                                error = noGalleryChangesMessage
                             )
                         )
                     }
@@ -445,8 +450,33 @@ class OverlayReviewViewModel @Inject constructor(
             samsungGalleryEditIntentFactory.availabilityFor(item.image)
         }
         return state.copy(
-            samsungGalleryDisabledReason = availability?.reason
+            canOpenInSamsungGallery = availability?.enabled == true,
+            samsungGalleryHelperText = availability?.helperText
         )
+    }
+
+    private suspend fun awaitExternalEditResult(
+        session: OverlayExternalEditSession
+    ): com.duplicatefinder.domain.model.ImageItem? {
+        var latestImage: com.duplicatefinder.domain.model.ImageItem? = null
+        repeat(EXTERNAL_EDIT_REQUERY_ATTEMPTS) { attempt ->
+            latestImage = imageRepository.getImageById(session.imageId)
+            if (latestImage == null || hasExternalEditMetadataChange(session, latestImage!!)) {
+                return latestImage
+            }
+            if (attempt < EXTERNAL_EDIT_REQUERY_ATTEMPTS - 1) {
+                delay(EXTERNAL_EDIT_REQUERY_DELAY_MS)
+            }
+        }
+        return latestImage
+    }
+
+    private fun hasExternalEditMetadataChange(
+        session: OverlayExternalEditSession,
+        latestImage: com.duplicatefinder.domain.model.ImageItem
+    ): Boolean {
+        return latestImage.size != session.originalSize ||
+            latestImage.dateModified != session.originalDateModified
     }
 
     private fun nextUndecidedIndex(
@@ -554,3 +584,6 @@ private fun List<OverlayReviewItem>.replaceImage(latestImage: com.duplicatefinde
         }
     }
 }
+
+private const val EXTERNAL_EDIT_REQUERY_ATTEMPTS = 5
+private const val EXTERNAL_EDIT_REQUERY_DELAY_MS = 400L

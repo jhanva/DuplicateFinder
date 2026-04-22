@@ -91,6 +91,7 @@
     <string name="overlay_apply_batch">Apply Batch (%1$d)</string>
     <string name="overlay_paused_message">Review paused. Resume when ready or apply the pending batch.</string>
     <string name="overlay_samsung_gallery_required">Requires Samsung Gallery AI editing on a supported Samsung device.</string>
+    <string name="overlay_samsung_gallery_advisory">Opens Samsung Gallery. Object Eraser availability depends on your device and Gallery version.</string>
     <string name="overlay_no_gallery_changes">No changes were detected in Samsung Gallery.</string>
     <string name="overlay_review_complete_title">Watermark Review Complete</string>
     <string name="overlay_summary_kept">Kept original: %1$d</string>

@@ -31,6 +31,10 @@ import org.mockito.Mockito
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class OverlayReviewViewModelTest {
+    private val requiredMessage = "Requires Samsung Gallery AI editing on a supported Samsung device."
+    private val advisoryMessage =
+        "Opens Samsung Gallery. Object Eraser availability depends on your device and Gallery version."
+    private val noChangesMessage = "No changes were detected in Samsung Gallery."
 
     private val dispatcher = StandardTestDispatcher()
 
@@ -96,17 +100,19 @@ class OverlayReviewViewModelTest {
 
         assertNotNull(state.pendingExternalEditIntent)
         assertEquals("com.sec.android.gallery3d", state.pendingExternalEditIntent?.`package`)
+        assertTrue(state.canOpenInSamsungGallery)
+        assertEquals(advisoryMessage, state.samsungGalleryHelperText)
         assertEquals(image.id, session?.imageId)
         assertEquals(image.size, session?.originalSize)
         assertEquals(image.dateModified, session?.originalDateModified)
     }
 
     @Test
-    fun `returning from samsung gallery with changed metadata marks image edited and advances`() = runTest(dispatcher) {
+    fun `returning from samsung gallery retries metadata lookup and advances when media store updates`() = runTest(dispatcher) {
         val originalImage = testImage(id = 1, size = 100, dateModified = 1)
         val editedImage = originalImage.copy(size = 200, dateModified = 2)
         val nextImage = testImage(id = 2, size = 150, dateModified = 3)
-        var returnEditedImage = false
+        var imageByIdCalls = 0
         val imageRepository = object : BaseImageRepositoryFake() {
             override suspend fun getImageCount(folders: Set<String>): Int = 2
             override suspend fun getImagesBatch(
@@ -116,7 +122,10 @@ class OverlayReviewViewModelTest {
             ) = listOf(originalImage, nextImage)
             override suspend fun getImageById(id: Long): ImageItem? {
                 return when (id) {
-                    originalImage.id -> if (returnEditedImage) editedImage else originalImage
+                    originalImage.id -> {
+                        imageByIdCalls += 1
+                        if (imageByIdCalls >= 3) editedImage else originalImage
+                    }
                     nextImage.id -> nextImage
                     else -> null
                 }
@@ -143,7 +152,6 @@ class OverlayReviewViewModelTest {
         viewModel.openCurrentInSamsungGallery()
         advanceUntilIdle()
         viewModel.onExternalEditorLaunchConsumed()
-        returnEditedImage = true
         viewModel.onExternalEditorResult()
         advanceUntilIdle()
 
@@ -152,6 +160,7 @@ class OverlayReviewViewModelTest {
         assertEquals(nextImage.id, state.currentItem?.image?.id)
         assertEquals(null, state.externalEditSession)
         assertEquals(null, state.pendingExternalEditIntent)
+        assertTrue(imageByIdCalls >= 3)
     }
 
     @Test
@@ -189,9 +198,7 @@ class OverlayReviewViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(emptySet<Long>(), state.editedInGalleryIds)
         assertEquals(image.id, state.currentItem?.image?.id)
-        assertTrue(
-            state.error?.contains("No changes were detected in Samsung Gallery.", ignoreCase = false) == true
-        )
+        assertEquals(noChangesMessage, state.error)
     }
 
     @Test
@@ -261,6 +268,8 @@ class OverlayReviewViewModelTest {
         overlayRepository: BaseOverlayRepositoryFake,
         samsungGalleryEditIntentFactory: SamsungGalleryEditIntentFactory = SamsungGalleryEditIntentFactory(
             deviceManufacturer = "samsung",
+            requiredMessage = requiredMessage,
+            advisoryMessage = advisoryMessage,
             canResolveEditIntent = { true }
         ),
         trashRepository: BaseTrashRepositoryFake = object : BaseTrashRepositoryFake() {}
@@ -279,6 +288,7 @@ class OverlayReviewViewModelTest {
                 dispatcher
             ),
             samsungGalleryEditIntentFactory = samsungGalleryEditIntentFactory,
+            noGalleryChangesMessage = noChangesMessage,
             moveToTrashUseCase = MoveToTrashUseCase(trashRepository)
         )
     }
