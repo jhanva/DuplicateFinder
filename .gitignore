@@ -54,12 +54,6 @@ captures/
 .vscode/
 .vs/
 
-# Shared Codex content comes from ../ai-skills through local Windows junctions.
-# Ignore the linked directories here to avoid duplicating upstream files in this repo.
-.agents/skills/
-.codex/agents/
-.codex/config.toml
-
 # Local Gradle home used for sandboxed builds in this workspace.
 .gradle-home/
 
