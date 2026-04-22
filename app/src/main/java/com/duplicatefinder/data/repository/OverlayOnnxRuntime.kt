@@ -10,7 +10,6 @@ import android.graphics.Color
 import com.duplicatefinder.domain.model.DetectionStage
 import com.duplicatefinder.domain.model.OverlayModelExecutionException
 import com.duplicatefinder.domain.model.OverlayRegion
-import com.duplicatefinder.domain.repository.OverlayInpainterInputFormat
 import com.duplicatefinder.domain.repository.OverlayModelBundleInfo
 import com.duplicatefinder.domain.repository.OverlayTensorRange
 import java.io.File
@@ -100,82 +99,6 @@ class OverlayOnnxRuntime @Inject constructor(
             )
         } finally {
             stage1Prepared.squareBitmap.recycle()
-        }
-    }
-
-    fun inpaint(
-        sourceBitmap: Bitmap,
-        regions: List<OverlayRegion>,
-        bundleInfo: OverlayModelBundleInfo
-    ): Bitmap {
-        if (regions.isEmpty()) return sourceBitmap.copy(Bitmap.Config.ARGB_8888, false)
-        val prepared = prepareSquareBitmap(
-            bitmap = sourceBitmap,
-            targetSize = bundleInfo.inputSizeInpainter
-        )
-        return try {
-            val inpainterSession = loadSession(bundleInfo.inpainterPath)
-            val squareRegions = prepared.projectRegions(regions)
-            val mask = OverlayOnnxPostProcessor.buildMask(
-                width = prepared.squareBitmap.width,
-                height = prepared.squareBitmap.height,
-                regions = squareRegions
-            )
-            val imageTensor = createImageTensor(
-                bitmap = prepared.squareBitmap,
-                tensorRange = bundleInfo.onnx.inpainter.tensorRange
-            )
-            val maskTensor = createMaskTensor(
-                mask = mask,
-                width = prepared.squareBitmap.width,
-                height = prepared.squareBitmap.height
-            )
-
-            try {
-                val inputs = when (bundleInfo.onnx.inpainter.inputFormat) {
-                    OverlayInpainterInputFormat.IMAGE_AND_MASK -> mapOf(
-                        bundleInfo.onnx.inpainter.imageInputName to imageTensor,
-                        bundleInfo.onnx.inpainter.maskInputName to maskTensor
-                    )
-
-                    OverlayInpainterInputFormat.CONCAT_IMAGE_MASK -> mapOf(
-                        bundleInfo.onnx.inpainter.imageInputName to createConcatenatedImageMaskTensor(
-                            bitmap = prepared.squareBitmap,
-                            mask = mask,
-                            tensorRange = bundleInfo.onnx.inpainter.tensorRange
-                        )
-                    )
-                }
-
-                try {
-                    inpainterSession.run(inputs).useResult { result ->
-                        val outputTensor = result.findTensor(bundleInfo.onnx.inpainter.outputName)
-                            ?: throw OverlayModelExecutionException(
-                                "Overlay model bundle failed during cleaning. Download the bundle again and retry."
-                            )
-                        val outputBitmap = tensorToBitmap(
-                            tensor = outputTensor,
-                            width = prepared.squareBitmap.width,
-                            height = prepared.squareBitmap.height,
-                            tensorRange = bundleInfo.onnx.inpainter.tensorRange
-                        )
-                        prepared.restoreBitmap(outputBitmap)
-                    }
-                } finally {
-                    inputs.values.forEach { tensor -> if (tensor !== imageTensor && tensor !== maskTensor) tensor.close() }
-                }
-            } finally {
-                imageTensor.close()
-                maskTensor.close()
-                prepared.squareBitmap.recycle()
-            }
-        } catch (error: OverlayModelExecutionException) {
-            throw error
-        } catch (error: Exception) {
-            throw OverlayModelExecutionException(
-                "Overlay model bundle failed during cleaning. Download the bundle again and retry.",
-                error
-            )
         }
     }
 
@@ -329,42 +252,6 @@ class OverlayOnnxRuntime @Inject constructor(
         )
     }
 
-    private fun createMaskTensor(
-        mask: FloatArray,
-        width: Int,
-        height: Int
-    ): OnnxTensor {
-        return OnnxTensor.createTensor(
-            environment,
-            FloatBuffer.wrap(mask),
-            longArrayOf(1, 1, height.toLong(), width.toLong())
-        )
-    }
-
-    private fun createConcatenatedImageMaskTensor(
-        bitmap: Bitmap,
-        mask: FloatArray,
-        tensorRange: OverlayTensorRange
-    ): OnnxTensor {
-        val width = bitmap.width
-        val height = bitmap.height
-        val pixels = IntArray(width * height)
-        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-        val data = FloatArray(4 * width * height)
-        val channelSize = width * height
-        pixels.forEachIndexed { index, color ->
-            data[index] = normalizeColor(Color.red(color), tensorRange)
-            data[channelSize + index] = normalizeColor(Color.green(color), tensorRange)
-            data[(channelSize * 2) + index] = normalizeColor(Color.blue(color), tensorRange)
-            data[(channelSize * 3) + index] = mask[index]
-        }
-        return OnnxTensor.createTensor(
-            environment,
-            FloatBuffer.wrap(data),
-            longArrayOf(1, 4, height.toLong(), width.toLong())
-        )
-    }
-
     private fun createTensor(
         values: FloatArray,
         shape: LongArray
@@ -376,43 +263,12 @@ class OverlayOnnxRuntime @Inject constructor(
         )
     }
 
-    private fun tensorToBitmap(
-        tensor: OnnxTensor,
-        width: Int,
-        height: Int,
-        tensorRange: OverlayTensorRange
-    ): Bitmap {
-        val shape = (tensor.info as TensorInfo).shape
-        val values = tensor.readFloatArray()
-        val channelCount = shape.getOrNull(shape.size - 3)?.toInt() ?: 3
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val pixels = IntArray(width * height)
-        val planeSize = width * height
-        for (index in pixels.indices) {
-            val red = denormalizeColor(values.getOrElse(index) { 0f }, tensorRange)
-            val green = denormalizeColor(values.getOrElse(planeSize + index) { values.getOrElse(index) { 0f } }, tensorRange)
-            val blueIndex = if (channelCount >= 3) (planeSize * 2) + index else planeSize + index
-            val blue = denormalizeColor(values.getOrElse(blueIndex) { values.getOrElse(index) { 0f } }, tensorRange)
-            pixels[index] = Color.argb(255, red, green, blue)
-        }
-        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
-        return bitmap
-    }
-
     private fun normalizeColor(value: Int, tensorRange: OverlayTensorRange): Float {
         val normalized = value.toFloat() / 255f
         return when (tensorRange) {
             OverlayTensorRange.ZERO_TO_ONE -> normalized
             OverlayTensorRange.NEGATIVE_ONE_TO_ONE -> (normalized * 2f) - 1f
         }
-    }
-
-    private fun denormalizeColor(value: Float, tensorRange: OverlayTensorRange): Int {
-        val normalized = when (tensorRange) {
-            OverlayTensorRange.ZERO_TO_ONE -> value
-            OverlayTensorRange.NEGATIVE_ONE_TO_ONE -> (value + 1f) / 2f
-        }
-        return (normalized.coerceIn(0f, 1f) * 255f).roundToInt().coerceIn(0, 255)
     }
 
     private fun OnnxTensor.readFloatArray(): FloatArray {

@@ -1,16 +1,14 @@
 package com.duplicatefinder.presentation.screens.overlay
 
+import android.content.Intent
 import android.content.IntentSender
-import com.duplicatefinder.domain.model.CleaningPreview
 import com.duplicatefinder.domain.model.OverlayReviewItem
-import com.duplicatefinder.domain.model.PreviewStatus
 import com.duplicatefinder.domain.model.ScanProgress
 
 data class OverlayReviewUiState(
     val isScanning: Boolean = false,
     val isApplyingBatch: Boolean = false,
     val isPaused: Boolean = false,
-    val isGeneratingPreview: Boolean = false,
     val scanProgress: ScanProgress = ScanProgress.initial(),
     val overlayItems: List<OverlayReviewItem> = emptyList(),
     val minOverlayScore: Float = DEFAULT_MIN_OVERLAY_SCORE,
@@ -19,13 +17,12 @@ data class OverlayReviewUiState(
     val keptImageIds: Set<Long> = emptySet(),
     val markedForTrashIds: Set<Long> = emptySet(),
     val movedToTrashIds: Set<Long> = emptySet(),
-    val cleaningRequestedIds: Set<Long> = emptySet(),
-    val completedCleanReplaceIds: Set<Long> = emptySet(),
-    val skippedPreviewIds: Set<Long> = emptySet(),
+    val editedInGalleryIds: Set<Long> = emptySet(),
     val pendingBatchIds: Set<Long> = emptySet(),
-    val pendingPreviewDeleteConfirmation: Boolean = false,
     val pendingDeleteIntentSender: IntentSender? = null,
-    val previewState: CleaningPreview? = null,
+    val externalEditSession: OverlayExternalEditSession? = null,
+    val pendingExternalEditIntent: Intent? = null,
+    val samsungGalleryDisabledReason: String? = null,
     val requiresFolderSelection: Boolean = false,
     val error: String? = null
 ) {
@@ -54,8 +51,7 @@ data class OverlayReviewUiState(
             id in keptImageIds ||
                 id in markedForTrashIds ||
                 id in movedToTrashIds ||
-                id in completedCleanReplaceIds ||
-                id in skippedPreviewIds
+                id in editedInGalleryIds
         }
 
     val pendingBatchCount: Int
@@ -67,14 +63,8 @@ data class OverlayReviewUiState(
     val movedToTrashCount: Int
         get() = movedToTrashIds.size
 
-    val cleanedReplaceCount: Int
-        get() = completedCleanReplaceIds.size
-
-    val skippedPreviewCount: Int
-        get() = skippedPreviewIds.size
-
-    val hasReadyPreview: Boolean
-        get() = previewState?.status == PreviewStatus.READY
+    val editedInGalleryCount: Int
+        get() = editedInGalleryIds.size
 
     val isReviewComplete: Boolean
         get() = !isScanning && hasFilterMatches && currentItem == null

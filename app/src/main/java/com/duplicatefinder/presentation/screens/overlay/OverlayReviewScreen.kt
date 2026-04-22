@@ -56,10 +56,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.duplicatefinder.R
 import com.duplicatefinder.domain.model.OverlayReviewItem
-import com.duplicatefinder.domain.model.supportsOverlayCleaning
 import com.duplicatefinder.presentation.components.ReviewEmptyState
 import com.duplicatefinder.presentation.components.ReviewNoFilterMatchesContent
-import com.duplicatefinder.presentation.components.ReviewSummaryContent
 import com.duplicatefinder.presentation.components.ScanProgressIndicator
 import com.duplicatefinder.util.extension.formatFileSize
 
@@ -77,6 +75,11 @@ fun OverlayReviewScreen(
     ) { result ->
         viewModel.onDeleteConfirmationResult(result.resultCode == Activity.RESULT_OK)
     }
+    val samsungGalleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        viewModel.onExternalEditorResult()
+    }
 
     LaunchedEffect(Unit) {
         viewModel.startReview()
@@ -87,6 +90,13 @@ fun OverlayReviewScreen(
             deletePermissionLauncher.launch(
                 IntentSenderRequest.Builder(intentSender).build()
             )
+        }
+    }
+
+    uiState.pendingExternalEditIntent?.let { intent ->
+        LaunchedEffect(intent) {
+            viewModel.onExternalEditorLaunchConsumed()
+            samsungGalleryLauncher.launch(intent)
         }
     }
 
@@ -121,7 +131,11 @@ fun OverlayReviewScreen(
                             }
                         ) {
                             Icon(
-                                imageVector = if (uiState.isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                                imageVector = if (uiState.isPaused) {
+                                    Icons.Default.PlayArrow
+                                } else {
+                                    Icons.Default.Pause
+                                },
                                 contentDescription = if (uiState.isPaused) {
                                     stringResource(R.string.overlay_resume)
                                 } else {
@@ -149,7 +163,7 @@ fun OverlayReviewScreen(
                     )
                 }
 
-                uiState.isApplyingBatch || uiState.isGeneratingPreview -> {
+                uiState.isApplyingBatch -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                 }
 
@@ -176,10 +190,7 @@ fun OverlayReviewScreen(
                         onKeep = viewModel::keepCurrent,
                         onMarkForTrash = viewModel::markCurrentForTrash,
                         onApplyBatch = viewModel::applyBatchToTrash,
-                        onGeneratePreview = viewModel::generatePreviewForCurrent,
-                        onKeepCleaned = viewModel::keepCleanedPreview,
-                        onDeleteAll = viewModel::deleteAllFromPreview,
-                        onSkipPreview = viewModel::skipPreview,
+                        onOpenInSamsungGallery = viewModel::openCurrentInSamsungGallery,
                         onOpenTrash = onOpenTrash,
                         onBack = onBack
                     )
@@ -196,10 +207,7 @@ private fun LoadedOverlayReviewState(
     onKeep: () -> Unit,
     onMarkForTrash: () -> Unit,
     onApplyBatch: () -> Unit,
-    onGeneratePreview: () -> Unit,
-    onKeepCleaned: () -> Unit,
-    onDeleteAll: () -> Unit,
-    onSkipPreview: () -> Unit,
+    onOpenInSamsungGallery: () -> Unit,
     onOpenTrash: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -239,17 +247,10 @@ private fun LoadedOverlayReviewState(
                 }
 
                 state.isReviewComplete -> {
-                    ReviewSummaryContent(
-                        completeTitle = stringResource(R.string.overlay_review_complete_title),
-                        keptText = stringResource(R.string.overlay_summary_kept, state.keptCount),
-                        movedText = stringResource(
-                            R.string.overlay_summary_moved,
-                            state.movedToTrashCount
-                        ),
-                        pendingText = stringResource(
-                            R.string.overlay_summary_pending,
-                            state.pendingBatchCount
-                        ),
+                    OverlayReviewSummaryContent(
+                        keptCount = state.keptCount,
+                        movedToTrashCount = state.movedToTrashCount,
+                        editedInGalleryCount = state.editedInGalleryCount,
                         pendingBatchCount = state.pendingBatchCount,
                         onApplyBatch = onApplyBatch,
                         onOpenTrash = onOpenTrash,
@@ -261,19 +262,15 @@ private fun LoadedOverlayReviewState(
                     state.currentItem?.let { item ->
                         OverlayReviewContent(
                             item = item,
-                            previewUri = state.previewState?.previewUri,
                             reviewedCount = state.reviewedCount,
                             totalCount = state.totalCount,
                             pendingBatchCount = state.pendingBatchCount,
                             isPaused = state.isPaused,
-                            hasReadyPreview = state.hasReadyPreview,
+                            samsungGalleryDisabledReason = state.samsungGalleryDisabledReason,
                             onKeep = onKeep,
                             onMarkForTrash = onMarkForTrash,
                             onApplyBatch = onApplyBatch,
-                            onGeneratePreview = onGeneratePreview,
-                            onKeepCleaned = onKeepCleaned,
-                            onDeleteAll = onDeleteAll,
-                            onSkipPreview = onSkipPreview
+                            onOpenInSamsungGallery = onOpenInSamsungGallery
                         )
                     }
                 }
@@ -364,20 +361,18 @@ private fun OverlayFilterCard(
 @Composable
 private fun OverlayReviewContent(
     item: OverlayReviewItem,
-    previewUri: android.net.Uri?,
     reviewedCount: Int,
     totalCount: Int,
     pendingBatchCount: Int,
     isPaused: Boolean,
-    hasReadyPreview: Boolean,
+    samsungGalleryDisabledReason: String?,
     onKeep: () -> Unit,
     onMarkForTrash: () -> Unit,
     onApplyBatch: () -> Unit,
-    onGeneratePreview: () -> Unit,
-    onKeepCleaned: () -> Unit,
-    onDeleteAll: () -> Unit,
-    onSkipPreview: () -> Unit
+    onOpenInSamsungGallery: () -> Unit
 ) {
+    val isSamsungGalleryEnabled = !isPaused && samsungGalleryDisabledReason == null
+
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -413,36 +408,14 @@ private fun OverlayReviewContent(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (hasReadyPreview && previewUri != null) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                AsyncImage(
-                    model = item.image.uri,
-                    contentDescription = item.image.name,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.weight(1f)
-                )
-                AsyncImage(
-                    model = previewUri,
-                    contentDescription = stringResource(R.string.overlay_preview_title),
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        } else {
-            AsyncImage(
-                model = item.image.uri,
-                contentDescription = item.image.name,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            )
-        }
+        AsyncImage(
+            model = item.image.uri,
+            contentDescription = item.image.name,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        )
 
         Spacer(modifier = Modifier.height(12.dp))
 
@@ -487,81 +460,60 @@ private fun OverlayReviewContent(
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        if (hasReadyPreview) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlinedButton(
+                onClick = onKeep,
+                enabled = !isPaused,
+                modifier = Modifier.weight(1f)
             ) {
-                OutlinedButton(
-                    onClick = onSkipPreview,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(stringResource(R.string.overlay_preview_skip))
-                }
-
-                OutlinedButton(
-                    onClick = onDeleteAll,
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    ),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(stringResource(R.string.overlay_preview_delete_all))
-                }
-
-                Button(
-                    onClick = onKeepCleaned,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(stringResource(R.string.overlay_preview_keep_cleaned))
-                }
+                Text(stringResource(R.string.quality_keep))
             }
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                OutlinedButton(
-                    onClick = onKeep,
-                    enabled = !isPaused,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(stringResource(R.string.quality_keep))
-                }
-
-                Button(
-                    onClick = onMarkForTrash,
-                    enabled = !isPaused,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    ),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.quality_mark_for_trash))
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
 
             Button(
-                onClick = onGeneratePreview,
-                enabled = !isPaused && item.image.supportsOverlayCleaning(),
-                modifier = Modifier.fillMaxWidth()
+                onClick = onMarkForTrash,
+                enabled = !isPaused,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                ),
+                modifier = Modifier.weight(1f)
             ) {
                 Icon(
-                    imageVector = Icons.Default.AutoFixHigh,
+                    imageVector = Icons.Default.Delete,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.overlay_remove_watermark))
+                Text(stringResource(R.string.quality_mark_for_trash))
             }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Button(
+            onClick = onOpenInSamsungGallery,
+            enabled = isSamsungGalleryEnabled,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Default.AutoFixHigh,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(stringResource(R.string.overlay_open_in_samsung_gallery))
+        }
+
+        if (samsungGalleryDisabledReason != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = samsungGalleryDisabledReason,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
 
         if (isPaused) {
@@ -571,6 +523,77 @@ private fun OverlayReviewContent(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+@Composable
+private fun OverlayReviewSummaryContent(
+    keptCount: Int,
+    movedToTrashCount: Int,
+    editedInGalleryCount: Int,
+    pendingBatchCount: Int,
+    onApplyBatch: () -> Unit,
+    onOpenTrash: () -> Unit,
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = stringResource(R.string.overlay_review_complete_title),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            text = stringResource(R.string.overlay_summary_kept, keptCount),
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Text(
+            text = stringResource(R.string.overlay_summary_moved, movedToTrashCount),
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Text(
+            text = stringResource(R.string.overlay_summary_edited, editedInGalleryCount),
+            style = MaterialTheme.typography.bodyLarge
+        )
+        Text(
+            text = stringResource(R.string.overlay_summary_pending, pendingBatchCount),
+            style = MaterialTheme.typography.bodyLarge
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        if (pendingBatchCount > 0) {
+            Button(
+                onClick = onApplyBatch,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(stringResource(R.string.quality_apply_final_batch))
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        OutlinedButton(
+            onClick = onOpenTrash,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(stringResource(R.string.quality_open_trash))
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = onBack,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(stringResource(R.string.nav_home))
         }
     }
 }

@@ -58,9 +58,7 @@ class EnsureOverlayModelBundleUseCaseTest {
         textDetectorPath = "ppocrv5_mobile_det.onnx",
         maskRefinerEncoderPath = "mobile_sam_encoder.onnx",
         maskRefinerDecoderPath = "mobile_sam_decoder.onnx",
-        inpainterPath = "aot_gan.onnx",
         inputSizeTextDetector = 512,
-        inputSizeMaskRefiner = 512,
-        inputSizeInpainter = 1024
+        inputSizeMaskRefiner = 512
     )
 }

@@ -2,24 +2,16 @@ package com.duplicatefinder.presentation.screens.overlay
 
 import android.content.IntentSender
 import com.duplicatefinder.domain.BaseImageRepositoryFake
-import com.duplicatefinder.domain.BaseOverlayCleaningRepositoryFake
-import com.duplicatefinder.domain.BaseOverlayCleaningModelRepositoryFake
 import com.duplicatefinder.domain.BaseOverlayModelBundleRepositoryFake
 import com.duplicatefinder.domain.BaseOverlayRepositoryFake
 import com.duplicatefinder.domain.BaseTrashRepositoryFake
 import com.duplicatefinder.domain.FakeSettingsRepository
-import com.duplicatefinder.domain.model.CleaningPreview
 import com.duplicatefinder.domain.model.ImageItem
-import com.duplicatefinder.domain.model.OverlayPreviewDecision
 import com.duplicatefinder.domain.model.UserConfirmationRequiredException
 import com.duplicatefinder.domain.testImage
 import com.duplicatefinder.domain.testOverlayDetection
 import com.duplicatefinder.domain.repository.OverlayModelBundleInfo
 import com.duplicatefinder.domain.repository.OverlayModelRuntime
-import com.duplicatefinder.domain.usecase.ApplyOverlayPreviewDecisionUseCase
-import com.duplicatefinder.domain.usecase.EnsureOverlayCleaningModelUseCase
-import com.duplicatefinder.domain.usecase.EnsureOverlayModelBundleUseCase
-import com.duplicatefinder.domain.usecase.GenerateOverlayPreviewUseCase
 import com.duplicatefinder.domain.usecase.MoveToTrashUseCase
 import com.duplicatefinder.domain.usecase.ScanOverlayCandidatesUseCase
 import kotlinx.coroutines.Dispatchers
@@ -46,7 +38,6 @@ class OverlayReviewViewModelTest {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         deleteConfirmed = false
-        applyDeleteCalls = 0
     }
 
     @After
@@ -72,7 +63,7 @@ class OverlayReviewViewModelTest {
     }
 
     @Test
-    fun `remove watermark generates preview for current item`() = runTest(dispatcher) {
+    fun `open in samsung gallery queues external edit intent and snapshots metadata`() = runTest(dispatcher) {
         val image = testImage(id = 1, size = 100)
         val imageRepository = object : BaseImageRepositoryFake() {
             override suspend fun getImageCount(folders: Set<String>): Int = 1
@@ -97,72 +88,75 @@ class OverlayReviewViewModelTest {
 
         viewModel.startReview()
         advanceUntilIdle()
-        viewModel.generatePreviewForCurrent()
+        viewModel.openCurrentInSamsungGallery()
         advanceUntilIdle()
 
-        assertNotNull(viewModel.uiState.value.previewState)
+        val state = viewModel.uiState.value
+        val session = state.externalEditSession
+
+        assertNotNull(state.pendingExternalEditIntent)
+        assertEquals("com.sec.android.gallery3d", state.pendingExternalEditIntent?.`package`)
+        assertEquals(image.id, session?.imageId)
+        assertEquals(image.size, session?.originalSize)
+        assertEquals(image.dateModified, session?.originalDateModified)
     }
 
     @Test
-    fun `remove watermark is blocked for unsupported image formats`() = runTest(dispatcher) {
-        val image = testImage(id = 1, size = 100, name = "image_1.gif").copy(
-            mimeType = "image/gif"
-        )
+    fun `returning from samsung gallery with changed metadata marks image edited and advances`() = runTest(dispatcher) {
+        val originalImage = testImage(id = 1, size = 100, dateModified = 1)
+        val editedImage = originalImage.copy(size = 200, dateModified = 2)
+        val nextImage = testImage(id = 2, size = 150, dateModified = 3)
+        var returnEditedImage = false
         val imageRepository = object : BaseImageRepositoryFake() {
-            override suspend fun getImageCount(folders: Set<String>): Int = 1
+            override suspend fun getImageCount(folders: Set<String>): Int = 2
             override suspend fun getImagesBatch(
                 folders: Set<String>,
                 limit: Int,
                 offset: Int
-            ) = listOf(image)
-            override suspend fun getImageById(id: Long) = image.takeIf { it.id == id }
-            override suspend fun getImagesByIds(ids: List<Long>) = listOf(image).filter { it.id in ids }
+            ) = listOf(originalImage, nextImage)
+            override suspend fun getImageById(id: Long): ImageItem? {
+                return when (id) {
+                    originalImage.id -> if (returnEditedImage) editedImage else originalImage
+                    nextImage.id -> nextImage
+                    else -> null
+                }
+            }
+            override suspend fun getImagesByIds(ids: List<Long>) =
+                listOf(originalImage, nextImage).filter { it.id in ids }
         }
         val overlayRepository = object : BaseOverlayRepositoryFake() {
             override suspend fun detectOverlayCandidates(
                 images: List<com.duplicatefinder.domain.model.ImageItem>,
                 modelVersion: String
-            ) = listOf(testOverlayDetection(image, score = 0.95f, modelVersion = modelVersion))
+            ) = listOf(
+                testOverlayDetection(originalImage, score = 0.95f, modelVersion = modelVersion),
+                testOverlayDetection(nextImage, score = 0.80f, modelVersion = modelVersion)
+            )
         }
-        val bundleRepository = BaseOverlayModelBundleRepositoryFake().apply {
-            activeBundleInfo = overlayBundleInfo()
-        }
-        val cleaningModelRepository = BaseOverlayCleaningModelRepositoryFake().apply {
-            activeModelInfo = cleaningModelInfo()
-        }
-        val cleaningRepository = BaseOverlayCleaningRepositoryFake()
-        val viewModel = OverlayReviewViewModel(
-            settingsRepository = FakeSettingsRepository().apply {
-                kotlinx.coroutines.runBlocking { setScanFolders(setOf("Camera")) }
-            },
+        val viewModel = createViewModel(
             imageRepository = imageRepository,
-            scanOverlayCandidatesUseCase = ScanOverlayCandidatesUseCase(
-                imageRepository,
-                overlayRepository,
-                bundleRepository,
-                dispatcher
-            ),
-            generateOverlayPreviewUseCase = GenerateOverlayPreviewUseCase(
-                ensureOverlayCleaningModelUseCase = EnsureOverlayCleaningModelUseCase(cleaningModelRepository),
-                overlayCleaningRepository = cleaningRepository
-            ),
-            applyOverlayPreviewDecisionUseCase = ApplyOverlayPreviewDecisionUseCase(cleaningRepository),
-            moveToTrashUseCase = MoveToTrashUseCase(object : BaseTrashRepositoryFake() {})
+            overlayRepository = overlayRepository
         )
 
         viewModel.startReview()
         advanceUntilIdle()
-        viewModel.generatePreviewForCurrent()
+        viewModel.openCurrentInSamsungGallery()
+        advanceUntilIdle()
+        viewModel.onExternalEditorLaunchConsumed()
+        returnEditedImage = true
+        viewModel.onExternalEditorResult()
         advanceUntilIdle()
 
-        assertEquals(0, cleaningRepository.generateCallCount)
-        assertEquals(null, viewModel.uiState.value.previewState)
-        assertTrue(viewModel.uiState.value.error?.contains("not supported", ignoreCase = true) == true)
+        val state = viewModel.uiState.value
+        assertEquals(setOf(originalImage.id), state.editedInGalleryIds)
+        assertEquals(nextImage.id, state.currentItem?.image?.id)
+        assertEquals(null, state.externalEditSession)
+        assertEquals(null, state.pendingExternalEditIntent)
     }
 
     @Test
-    fun `skip preview advances keeping original`() = runTest(dispatcher) {
-        val image = testImage(id = 1, size = 100)
+    fun `returning from samsung gallery without metadata changes keeps current item pending`() = runTest(dispatcher) {
+        val image = testImage(id = 1, size = 100, dateModified = 1)
         val imageRepository = object : BaseImageRepositoryFake() {
             override suspend fun getImageCount(folders: Set<String>): Int = 1
             override suspend fun getImagesBatch(
@@ -186,50 +180,22 @@ class OverlayReviewViewModelTest {
 
         viewModel.startReview()
         advanceUntilIdle()
-        viewModel.generatePreviewForCurrent()
+        viewModel.openCurrentInSamsungGallery()
         advanceUntilIdle()
-        viewModel.skipPreview()
+        viewModel.onExternalEditorLaunchConsumed()
+        viewModel.onExternalEditorResult()
         advanceUntilIdle()
 
-        assertEquals(setOf(image.id), viewModel.uiState.value.skippedPreviewIds)
-    }
-
-    @Test
-    fun `confirm cleaned replacement advances to next item`() = runTest(dispatcher) {
-        val image = testImage(id = 1, size = 100)
-        val imageRepository = object : BaseImageRepositoryFake() {
-            override suspend fun getImageCount(folders: Set<String>): Int = 1
-            override suspend fun getImagesBatch(
-                folders: Set<String>,
-                limit: Int,
-                offset: Int
-            ) = listOf(image)
-            override suspend fun getImageById(id: Long) = image.takeIf { it.id == id }
-            override suspend fun getImagesByIds(ids: List<Long>) = listOf(image).filter { it.id in ids }
-        }
-        val overlayRepository = object : BaseOverlayRepositoryFake() {
-            override suspend fun detectOverlayCandidates(
-                images: List<com.duplicatefinder.domain.model.ImageItem>,
-                modelVersion: String
-            ) = listOf(testOverlayDetection(image, score = 0.95f, modelVersion = modelVersion))
-        }
-        val viewModel = createViewModel(
-            imageRepository = imageRepository,
-            overlayRepository = overlayRepository
+        val state = viewModel.uiState.value
+        assertEquals(emptySet<Long>(), state.editedInGalleryIds)
+        assertEquals(image.id, state.currentItem?.image?.id)
+        assertTrue(
+            state.error?.contains("No changes were detected in Samsung Gallery.", ignoreCase = false) == true
         )
-
-        viewModel.startReview()
-        advanceUntilIdle()
-        viewModel.generatePreviewForCurrent()
-        advanceUntilIdle()
-        viewModel.keepCleanedPreview()
-        advanceUntilIdle()
-
-        assertEquals(setOf(image.id), viewModel.uiState.value.completedCleanReplaceIds)
     }
 
     @Test
-    fun `delete all keeps preview pending until user confirms and then completes`() = runTest(dispatcher) {
+    fun `batch trash confirmation still moves items after user approval`() = runTest(dispatcher) {
         val image = testImage(id = 1, size = 100)
         val imageRepository = object : BaseImageRepositoryFake() {
             override suspend fun getImageCount(folders: Set<String>): Int = 1
@@ -253,35 +219,27 @@ class OverlayReviewViewModelTest {
             ) = listOf(testOverlayDetection(image, score = 0.95f, modelVersion = modelVersion))
         }
         val intentSender = Mockito.mock(IntentSender::class.java)
-        val cleaningRepository = object : BaseOverlayCleaningRepositoryFake() {
-            override suspend fun applyDecision(
-                image: ImageItem,
-                preview: CleaningPreview,
-                decision: OverlayPreviewDecision
-            ): Result<Unit> {
-                lastDecision = decision
-                applyDeleteCalls += 1
-                return if (decision == OverlayPreviewDecision.DELETE_ALL && !deleteConfirmed) {
+        val trashRepository = object : BaseTrashRepositoryFake() {
+            override suspend fun moveToTrash(images: List<ImageItem>): Result<Int> {
+                return if (!deleteConfirmed) {
                     Result.failure(UserConfirmationRequiredException(intentSender))
                 } else {
-                    Result.success(Unit)
+                    Result.success(images.size)
                 }
             }
         }
         val viewModel = createViewModel(
             imageRepository = imageRepository,
             overlayRepository = overlayRepository,
-            cleaningRepository = cleaningRepository
+            trashRepository = trashRepository
         )
 
         viewModel.startReview()
         advanceUntilIdle()
-        viewModel.generatePreviewForCurrent()
-        advanceUntilIdle()
-        viewModel.deleteAllFromPreview()
+        viewModel.markCurrentForTrash()
+        viewModel.applyBatchToTrash()
         advanceUntilIdle()
 
-        assertNotNull(viewModel.uiState.value.previewState)
         assertEquals(intentSender, viewModel.uiState.value.pendingDeleteIntentSender)
         assertEquals(emptySet<Long>(), viewModel.uiState.value.movedToTrashIds)
 
@@ -289,14 +247,11 @@ class OverlayReviewViewModelTest {
         viewModel.onDeleteConfirmationResult(granted = true)
         advanceUntilIdle()
 
-        assertEquals(null, viewModel.uiState.value.previewState)
         assertEquals(setOf(image.id), viewModel.uiState.value.movedToTrashIds)
         assertEquals(null, viewModel.uiState.value.pendingDeleteIntentSender)
-        assertEquals(2, applyDeleteCalls)
     }
 
     private var deleteConfirmed = false
-    private var applyDeleteCalls = 0
 
     private fun createViewModel(
         settingsRepository: FakeSettingsRepository = FakeSettingsRepository().apply {
@@ -304,13 +259,14 @@ class OverlayReviewViewModelTest {
         },
         imageRepository: BaseImageRepositoryFake,
         overlayRepository: BaseOverlayRepositoryFake,
-        cleaningRepository: BaseOverlayCleaningRepositoryFake = BaseOverlayCleaningRepositoryFake()
+        samsungGalleryEditIntentFactory: SamsungGalleryEditIntentFactory = SamsungGalleryEditIntentFactory(
+            deviceManufacturer = "samsung",
+            canResolveEditIntent = { true }
+        ),
+        trashRepository: BaseTrashRepositoryFake = object : BaseTrashRepositoryFake() {}
     ): OverlayReviewViewModel {
         val bundleRepository = BaseOverlayModelBundleRepositoryFake().apply {
             activeBundleInfo = overlayBundleInfo()
-        }
-        val cleaningModelRepository = BaseOverlayCleaningModelRepositoryFake().apply {
-            activeModelInfo = cleaningModelInfo()
         }
 
         return OverlayReviewViewModel(
@@ -322,12 +278,8 @@ class OverlayReviewViewModelTest {
                 bundleRepository,
                 dispatcher
             ),
-            generateOverlayPreviewUseCase = GenerateOverlayPreviewUseCase(
-                ensureOverlayCleaningModelUseCase = EnsureOverlayCleaningModelUseCase(cleaningModelRepository),
-                overlayCleaningRepository = cleaningRepository
-            ),
-            applyOverlayPreviewDecisionUseCase = ApplyOverlayPreviewDecisionUseCase(cleaningRepository),
-            moveToTrashUseCase = MoveToTrashUseCase(object : BaseTrashRepositoryFake() {})
+            samsungGalleryEditIntentFactory = samsungGalleryEditIntentFactory,
+            moveToTrashUseCase = MoveToTrashUseCase(trashRepository)
         )
     }
 
@@ -337,21 +289,7 @@ class OverlayReviewViewModelTest {
         textDetectorPath = "ppocrv5_mobile_det.onnx",
         maskRefinerEncoderPath = "mobile_sam_encoder.onnx",
         maskRefinerDecoderPath = "mobile_sam_decoder.onnx",
-        inpainterPath = "aot_gan.onnx",
         inputSizeTextDetector = 512,
-        inputSizeMaskRefiner = 512,
-        inputSizeInpainter = 1024
-    )
-
-    private fun cleaningModelInfo() = OverlayModelBundleInfo(
-        bundleVersion = "overlay-cleaning-aot-gan-v1",
-        runtime = OverlayModelRuntime.ONNX_RUNTIME_ANDROID,
-        textDetectorPath = "",
-        maskRefinerEncoderPath = "",
-        maskRefinerDecoderPath = "",
-        inpainterPath = "AOT-GAN.onnx",
-        inputSizeTextDetector = 0,
-        inputSizeMaskRefiner = 0,
-        inputSizeInpainter = 512
+        inputSizeMaskRefiner = 512
     )
 }

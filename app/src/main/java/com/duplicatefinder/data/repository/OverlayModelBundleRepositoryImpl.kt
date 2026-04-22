@@ -1,15 +1,12 @@
 package com.duplicatefinder.data.repository
 
+import com.duplicatefinder.domain.repository.OverlayDetectorOutputFormat
 import com.duplicatefinder.domain.repository.OverlayModelBundleInfo
+import com.duplicatefinder.domain.repository.OverlayModelBundleRepository
+import com.duplicatefinder.domain.repository.OverlayModelRuntime
 import com.duplicatefinder.domain.repository.OverlayOnnxDetectorContract
 import com.duplicatefinder.domain.repository.OverlayOnnxMaskRefinerContract
-import com.duplicatefinder.domain.repository.OverlayOnnxInpainterContract
 import com.duplicatefinder.domain.repository.OverlayOnnxRuntimeContract
-import com.duplicatefinder.domain.repository.OverlayDetectorOutputFormat
-import com.duplicatefinder.domain.repository.OverlayInpainterInputFormat
-import com.duplicatefinder.domain.repository.OverlayModelRuntime
-import com.duplicatefinder.domain.repository.OverlayModelBundleRepository
-import com.duplicatefinder.domain.repository.OverlayTensorRange
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -145,7 +142,6 @@ class OverlayModelBundleRepositoryImpl @Inject constructor(
             maskRefinerDecoderPath = json.optString("maskRefinerDecoderPath")
                 .takeIf { it.isNotBlank() }
                 ?: json.getString("detectorStage2Path"),
-            inpainterPath = json.getString("inpainterPath"),
             inputSizeTextDetector = json.optInt(
                 "inputSizeTextDetector",
                 json.optInt("inputSizeStage1", 512)
@@ -154,7 +150,6 @@ class OverlayModelBundleRepositoryImpl @Inject constructor(
                 "inputSizeMaskRefiner",
                 json.optInt("inputSizeStage2", 512)
             ),
-            inputSizeInpainter = json.optInt("inputSizeInpainter", 1024),
             onnx = json.optJSONObject("onnx").toOnnxRuntimeContract(),
             manifestUrl = defaultManifestUrl
         )
@@ -163,7 +158,6 @@ class OverlayModelBundleRepositoryImpl @Inject constructor(
     private fun JSONObject?.toOnnxRuntimeContract(): OverlayOnnxRuntimeContract {
         val detectorJson = this?.optJSONObject("detector")
         val maskRefinerJson = this?.optJSONObject("maskRefiner")
-        val inpainterJson = this?.optJSONObject("inpainter")
         return OverlayOnnxRuntimeContract(
             detector = OverlayOnnxDetectorContract(
                 inputName = detectorJson?.optString("inputName")
@@ -217,25 +211,6 @@ class OverlayModelBundleRepositoryImpl @Inject constructor(
                 maskThreshold = maskRefinerJson?.optDouble("maskThreshold", 0.0)
                     ?.toFloat()
                     ?: 0f
-            ),
-            inpainter = OverlayOnnxInpainterContract(
-                imageInputName = inpainterJson?.optString("imageInputName")
-                    .takeUnless { it.isNullOrBlank() }
-                    ?: "image",
-                maskInputName = inpainterJson?.optString("maskInputName")
-                    .takeUnless { it.isNullOrBlank() }
-                    ?: "mask",
-                outputName = inpainterJson?.optString("outputName")
-                    .takeUnless { it.isNullOrBlank() }
-                    ?: "output",
-                inputFormat = inpainterJson?.optString("inputFormat")
-                    ?.takeIf { it.isNotBlank() }
-                    ?.let(OverlayInpainterInputFormat::fromManifestValue)
-                    ?: OverlayInpainterInputFormat.IMAGE_AND_MASK,
-                tensorRange = inpainterJson?.optString("tensorRange")
-                    ?.takeIf { it.isNotBlank() }
-                    ?.let(OverlayTensorRange::fromManifestValue)
-                    ?: OverlayTensorRange.ZERO_TO_ONE
             )
         )
     }

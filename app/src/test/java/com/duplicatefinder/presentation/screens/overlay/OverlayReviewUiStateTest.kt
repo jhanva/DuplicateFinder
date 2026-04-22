@@ -1,11 +1,9 @@
 package com.duplicatefinder.presentation.screens.overlay
 
-import com.duplicatefinder.domain.testCleaningPreview
 import com.duplicatefinder.domain.testImage
 import com.duplicatefinder.domain.testOverlayDetection
 import com.duplicatefinder.domain.model.OverlayReviewItem
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -35,21 +33,22 @@ class OverlayReviewUiStateTest {
             isScanning = false,
             overlayItems = listOf(item),
             currentIndex = -1,
-            keptImageIds = setOf(item.image.id)
+            editedInGalleryIds = setOf(item.image.id)
         )
 
         assertTrue(state.isReviewComplete)
     }
 
     @Test
-    fun `preview ready state exposes the generated preview`() {
-        val image = testImage(id = 1, size = 1_024L)
+    fun `reviewed count includes edited in gallery ids`() {
+        val item = overlayItem(id = 1, score = 0.95f)
         val state = OverlayReviewUiState(
-            previewState = testCleaningPreview(image)
+            overlayItems = listOf(item),
+            editedInGalleryIds = setOf(item.image.id)
         )
 
-        assertNotNull(state.previewState?.previewUri)
-        assertTrue(state.hasReadyPreview)
+        assertEquals(1, state.reviewedCount)
+        assertEquals(1, state.editedInGalleryCount)
     }
 
     private fun overlayItem(id: Long, score: Float): OverlayReviewItem {

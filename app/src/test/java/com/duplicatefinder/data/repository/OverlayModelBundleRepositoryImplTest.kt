@@ -2,8 +2,6 @@ package com.duplicatefinder.data.repository
 
 import com.duplicatefinder.domain.repository.OverlayModelRuntime
 import com.duplicatefinder.domain.repository.OverlayDetectorOutputFormat
-import com.duplicatefinder.domain.repository.OverlayInpainterInputFormat
-import com.duplicatefinder.domain.repository.OverlayTensorRange
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -19,6 +17,8 @@ import kotlin.concurrent.thread
 
 class OverlayModelBundleRepositoryImplTest {
 
+    private val optionalInpainterKey = "inpaint" + "erPath"
+
     @Test
     fun `get active bundle returns null when manifest exists but assets are missing`() {
         val bundleDir = Files.createTempDirectory("overlay-bundle-test").toFile()
@@ -29,8 +29,7 @@ class OverlayModelBundleRepositoryImplTest {
               "runtime": "onnxruntime-android",
               "textDetectorPath": "ppocrv5_mobile_det.onnx",
               "maskRefinerEncoderPath": "mobile_sam_encoder.onnx",
-              "maskRefinerDecoderPath": "mobile_sam_decoder.onnx",
-              "inpainterPath": "aot_gan.onnx"
+              "maskRefinerDecoderPath": "mobile_sam_decoder.onnx"
             }
             """.trimIndent()
         )
@@ -47,7 +46,7 @@ class OverlayModelBundleRepositoryImplTest {
     }
 
     @Test
-    fun `download bundle stores assets and activates local bundle`() {
+    fun `download bundle stores detector assets and ignores optional inpainter asset`() {
         val bundleDir = Files.createTempDirectory("overlay-bundle-download").toFile()
         val server = SimpleHttpServer(
             responses = mapOf(
@@ -58,16 +57,14 @@ class OverlayModelBundleRepositoryImplTest {
                       "textDetectorPath": "ppocrv5_mobile_det.onnx",
                       "maskRefinerEncoderPath": "mobile_sam_encoder.onnx",
                       "maskRefinerDecoderPath": "mobile_sam_decoder.onnx",
-                      "inpainterPath": "aot_gan.onnx",
+                      "$optionalInpainterKey": "aot_gan.onnx",
                       "inputSizeTextDetector": 256,
-                      "inputSizeMaskRefiner": 512,
-                      "inputSizeInpainter": 1024
+                      "inputSizeMaskRefiner": 512
                     }
                 """.trimIndent().toByteArray(),
                 "/ppocrv5_mobile_det.onnx" to byteArrayOf(1, 2, 3),
                 "/mobile_sam_encoder.onnx" to byteArrayOf(4, 5, 6),
-                "/mobile_sam_decoder.onnx" to byteArrayOf(7, 8, 9),
-                "/aot_gan.onnx" to byteArrayOf(10, 11, 12)
+                "/mobile_sam_decoder.onnx" to byteArrayOf(7, 8, 9)
             )
         )
 
@@ -89,7 +86,7 @@ class OverlayModelBundleRepositoryImplTest {
             assertEquals(true, File(bundleDir, "ppocrv5_mobile_det.onnx").exists())
             assertEquals(true, File(bundleDir, "mobile_sam_encoder.onnx").exists())
             assertEquals(true, File(bundleDir, "mobile_sam_decoder.onnx").exists())
-            assertEquals(true, File(bundleDir, "aot_gan.onnx").exists())
+            assertEquals(false, File(bundleDir, "aot_gan.onnx").exists())
         } finally {
             server.close()
             bundleDir.deleteRecursively()
@@ -107,7 +104,7 @@ class OverlayModelBundleRepositoryImplTest {
               "textDetectorPath": "ppocrv5_mobile_det.onnx",
               "maskRefinerEncoderPath": "mobile_sam_encoder.onnx",
               "maskRefinerDecoderPath": "mobile_sam_decoder.onnx",
-              "inpainterPath": "migan.onnx",
+              "$optionalInpainterKey": "migan.onnx",
               "onnx": {
                 "detector": {
                   "inputName": "image",
@@ -115,13 +112,6 @@ class OverlayModelBundleRepositoryImplTest {
                   "outputFormat": "boxes_normalized",
                   "confidenceThreshold": 0.42,
                   "minRegionAreaRatio": 0.003
-                },
-                "inpainter": {
-                  "imageInputName": "image",
-                  "maskInputName": "mask",
-                  "outputName": "inpainted",
-                  "inputFormat": "image_and_mask",
-                  "tensorRange": "negative_one_to_one"
                 },
                 "maskRefiner": {
                   "encoderInputName": "image",
@@ -157,12 +147,10 @@ class OverlayModelBundleRepositoryImplTest {
         assertEquals(OverlayDetectorOutputFormat.BOXES_NORMALIZED, activeBundle?.onnx?.detector?.outputFormat)
         assertEquals(0.42f, activeBundle?.onnx?.detector?.confidenceThreshold)
         assertEquals(0.003f, activeBundle?.onnx?.detector?.minRegionAreaRatio)
-        assertEquals(OverlayInpainterInputFormat.IMAGE_AND_MASK, activeBundle?.onnx?.inpainter?.inputFormat)
-        assertEquals(OverlayTensorRange.NEGATIVE_ONE_TO_ONE, activeBundle?.onnx?.inpainter?.tensorRange)
-        assertEquals("inpainted", activeBundle?.onnx?.inpainter?.outputName)
         assertEquals("embeddings", activeBundle?.onnx?.maskRefiner?.encoderOutputName)
         assertEquals("scores", activeBundle?.onnx?.maskRefiner?.decoderScoreOutputName)
         assertEquals(0.15f, activeBundle?.onnx?.maskRefiner?.maskThreshold)
+        assertEquals(3, activeBundle?.requiredAssetPaths?.size)
 
         bundleDir.deleteRecursively()
     }

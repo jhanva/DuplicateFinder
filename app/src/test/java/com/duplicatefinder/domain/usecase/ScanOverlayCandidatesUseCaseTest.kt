@@ -151,10 +151,8 @@ class ScanOverlayCandidatesUseCaseTest {
                 textDetectorPath = "det.onnx",
                 maskRefinerEncoderPath = "enc.onnx",
                 maskRefinerDecoderPath = "dec.onnx",
-                inpainterPath = "inp.onnx",
                 inputSizeTextDetector = 512,
-                inputSizeMaskRefiner = 512,
-                inputSizeInpainter = 1024
+                inputSizeMaskRefiner = 512
             )
         }
 

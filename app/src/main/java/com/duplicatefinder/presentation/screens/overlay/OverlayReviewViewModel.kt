@@ -1,22 +1,16 @@
 package com.duplicatefinder.presentation.screens.overlay
 
-import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.duplicatefinder.domain.model.OverlayPreviewDecision
 import com.duplicatefinder.domain.model.OverlayReviewItem
 import com.duplicatefinder.domain.model.ScanPhase
 import com.duplicatefinder.domain.model.UserConfirmationRequiredException
-import com.duplicatefinder.domain.model.supportsOverlayCleaning
 import com.duplicatefinder.domain.repository.ImageRepository
 import com.duplicatefinder.domain.repository.SettingsRepository
-import com.duplicatefinder.domain.usecase.ApplyOverlayPreviewDecisionUseCase
-import com.duplicatefinder.domain.usecase.GenerateOverlayPreviewUseCase
 import com.duplicatefinder.domain.usecase.MoveToTrashUseCase
 import com.duplicatefinder.domain.usecase.ScanOverlayCandidatesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,8 +24,7 @@ class OverlayReviewViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val imageRepository: ImageRepository,
     private val scanOverlayCandidatesUseCase: ScanOverlayCandidatesUseCase,
-    private val generateOverlayPreviewUseCase: GenerateOverlayPreviewUseCase,
-    private val applyOverlayPreviewDecisionUseCase: ApplyOverlayPreviewDecisionUseCase,
+    private val samsungGalleryEditIntentFactory: SamsungGalleryEditIntentFactory,
     private val moveToTrashUseCase: MoveToTrashUseCase
 ) : ViewModel() {
 
@@ -49,7 +42,7 @@ class OverlayReviewViewModel @Inject constructor(
                     it.copy(
                         isScanning = true,
                         isPaused = false,
-                        isGeneratingPreview = false,
+                        scanProgress = com.duplicatefinder.domain.model.ScanProgress.initial(),
                         error = null,
                         requiresFolderSelection = false,
                         overlayItems = emptyList(),
@@ -59,13 +52,12 @@ class OverlayReviewViewModel @Inject constructor(
                         keptImageIds = emptySet(),
                         markedForTrashIds = emptySet(),
                         movedToTrashIds = emptySet(),
-                        cleaningRequestedIds = emptySet(),
-                        completedCleanReplaceIds = emptySet(),
-                        skippedPreviewIds = emptySet(),
+                        editedInGalleryIds = emptySet(),
                         pendingBatchIds = emptySet(),
-                        pendingPreviewDeleteConfirmation = false,
                         pendingDeleteIntentSender = null,
-                        previewState = null
+                        externalEditSession = null,
+                        pendingExternalEditIntent = null,
+                        samsungGalleryDisabledReason = null
                     )
                 }
 
@@ -86,8 +78,7 @@ class OverlayReviewViewModel @Inject constructor(
                     _uiState.update { current ->
                         val isComplete = scanState.progress.phase == ScanPhase.COMPLETE
                         val hasItems = scanState.items.isNotEmpty()
-
-                        if (hasItems) {
+                        val nextState = if (hasItems) {
                             val filteredItems = filterItemsByRange(
                                 items = scanState.items,
                                 minScore = current.minOverlayScore,
@@ -96,15 +87,18 @@ class OverlayReviewViewModel @Inject constructor(
                             val currentItemId = current.currentItem?.image?.id
                             val newIndex = if (currentItemId != null) {
                                 val idx = filteredItems.indexOfFirst { it.image.id == currentItemId }
-                                if (idx >= 0) idx else nextUndecidedIndex(
-                                    items = filteredItems,
-                                    start = 0,
-                                    kept = current.keptImageIds,
-                                    marked = current.markedForTrashIds,
-                                    moved = current.movedToTrashIds,
-                                    cleaned = current.completedCleanReplaceIds,
-                                    skipped = current.skippedPreviewIds
-                                )
+                                if (idx >= 0) {
+                                    idx
+                                } else {
+                                    nextUndecidedIndex(
+                                        items = filteredItems,
+                                        start = 0,
+                                        kept = current.keptImageIds,
+                                        marked = current.markedForTrashIds,
+                                        moved = current.movedToTrashIds,
+                                        edited = current.editedInGalleryIds
+                                    )
+                                }
                             } else {
                                 nextUndecidedIndex(
                                     items = filteredItems,
@@ -112,8 +106,7 @@ class OverlayReviewViewModel @Inject constructor(
                                     kept = current.keptImageIds,
                                     marked = current.markedForTrashIds,
                                     moved = current.movedToTrashIds,
-                                    cleaned = current.completedCleanReplaceIds,
-                                    skipped = current.skippedPreviewIds
+                                    edited = current.editedInGalleryIds
                                 )
                             }
 
@@ -130,6 +123,8 @@ class OverlayReviewViewModel @Inject constructor(
                                 scanProgress = scanState.progress
                             )
                         }
+
+                        withSamsungGalleryAvailability(nextState)
                     }
                 }
             } catch (e: Exception) {
@@ -145,21 +140,22 @@ class OverlayReviewViewModel @Inject constructor(
 
     fun keepCurrent() {
         val state = _uiState.value
-        if (state.isPaused || state.hasReadyPreview) return
+        if (state.isPaused) return
         val current = state.currentItem ?: return
 
         _uiState.update {
             val kept = it.keptImageIds + current.image.id
-            it.copy(
-                keptImageIds = kept,
-                currentIndex = nextUndecidedIndex(
-                    items = it.filteredOverlayItems,
-                    start = (it.currentIndex + 1).coerceAtLeast(0),
-                    kept = kept,
-                    marked = it.markedForTrashIds,
-                    moved = it.movedToTrashIds,
-                    cleaned = it.completedCleanReplaceIds,
-                    skipped = it.skippedPreviewIds
+            withSamsungGalleryAvailability(
+                it.copy(
+                    keptImageIds = kept,
+                    currentIndex = nextUndecidedIndex(
+                        items = it.filteredOverlayItems,
+                        start = (it.currentIndex + 1).coerceAtLeast(0),
+                        kept = kept,
+                        marked = it.markedForTrashIds,
+                        moved = it.movedToTrashIds,
+                        edited = it.editedInGalleryIds
+                    )
                 )
             )
         }
@@ -167,79 +163,118 @@ class OverlayReviewViewModel @Inject constructor(
 
     fun markCurrentForTrash() {
         val state = _uiState.value
-        if (state.isPaused || state.hasReadyPreview) return
+        if (state.isPaused) return
         val current = state.currentItem ?: return
 
         _uiState.update {
             val marked = it.markedForTrashIds + current.image.id
-            it.copy(
-                markedForTrashIds = marked,
-                currentIndex = nextUndecidedIndex(
-                    items = it.filteredOverlayItems,
-                    start = (it.currentIndex + 1).coerceAtLeast(0),
-                    kept = it.keptImageIds,
-                    marked = marked,
-                    moved = it.movedToTrashIds,
-                    cleaned = it.completedCleanReplaceIds,
-                    skipped = it.skippedPreviewIds
+            withSamsungGalleryAvailability(
+                it.copy(
+                    markedForTrashIds = marked,
+                    currentIndex = nextUndecidedIndex(
+                        items = it.filteredOverlayItems,
+                        start = (it.currentIndex + 1).coerceAtLeast(0),
+                        kept = it.keptImageIds,
+                        marked = marked,
+                        moved = it.movedToTrashIds,
+                        edited = it.editedInGalleryIds
+                    )
                 )
             )
         }
     }
 
-    fun generatePreviewForCurrent() {
+    fun openCurrentInSamsungGallery() {
         val state = _uiState.value
-        if (state.isPaused || state.isGeneratingPreview) return
+        if (state.isPaused || state.externalEditSession != null) return
         val current = state.currentItem ?: return
-        if (!current.image.supportsOverlayCleaning()) {
+        val availability = samsungGalleryEditIntentFactory.availabilityFor(current.image)
+
+        if (!availability.enabled) {
             _uiState.update {
-                it.copy(
-                    error = "Remove Watermark is not supported for ${current.image.mimeType} files."
+                withSamsungGalleryAvailability(
+                    it.copy(error = availability.reason ?: "Samsung Gallery is not available.")
                 )
             }
             return
         }
 
-        viewModelScope.launch {
-            _uiState.update {
+        _uiState.update {
+            withSamsungGalleryAvailability(
                 it.copy(
-                    isGeneratingPreview = true,
-                    error = null,
-                    cleaningRequestedIds = it.cleaningRequestedIds + current.image.id
+                    externalEditSession = OverlayExternalEditSession(
+                        imageId = current.image.id,
+                        originalSize = current.image.size,
+                        originalDateModified = current.image.dateModified,
+                        startedAt = System.currentTimeMillis()
+                    ),
+                    pendingExternalEditIntent = samsungGalleryEditIntentFactory.createIntent(current.image),
+                    error = null
                 )
-            }
-
-            generateOverlayPreviewUseCase(
-                detection = current.detection,
-                allowDownload = true
-            ).onSuccess { preview ->
-                _uiState.update {
-                    it.copy(
-                        isGeneratingPreview = false,
-                        previewState = preview
-                    )
-                }
-            }.onFailure { error ->
-                _uiState.update {
-                    it.copy(
-                        isGeneratingPreview = false,
-                        error = error.message ?: "Failed to generate cleaned preview."
-                    )
-                }
-            }
+            )
         }
     }
 
-    fun keepCleanedPreview() {
-        applyPreviewDecision(OverlayPreviewDecision.KEEP_CLEANED_REPLACE_ORIGINAL)
+    fun onExternalEditorLaunchConsumed() {
+        _uiState.update { it.copy(pendingExternalEditIntent = null) }
     }
 
-    fun deleteAllFromPreview() {
-        applyPreviewDecision(OverlayPreviewDecision.DELETE_ALL)
-    }
+    fun onExternalEditorResult() {
+        val session = _uiState.value.externalEditSession ?: return
 
-    fun skipPreview() {
-        applyPreviewDecision(OverlayPreviewDecision.SKIP_KEEP_ORIGINAL)
+        viewModelScope.launch {
+            val latestImage = imageRepository.getImageById(session.imageId)
+            _uiState.update { current ->
+                if (latestImage == null) {
+                    withSamsungGalleryAvailability(
+                        current.copy(
+                            externalEditSession = null,
+                            pendingExternalEditIntent = null,
+                            error = "The image changed or no longer exists."
+                        )
+                    )
+                } else {
+                    val updatedItems = current.overlayItems.replaceImage(latestImage)
+                    val metadataChanged = latestImage.size != session.originalSize ||
+                        latestImage.dateModified != session.originalDateModified
+
+                    if (metadataChanged) {
+                        val edited = current.editedInGalleryIds + latestImage.id
+                        val filteredItems = filterItemsByRange(
+                            items = updatedItems,
+                            minScore = current.minOverlayScore,
+                            maxScore = current.maxOverlayScore
+                        )
+                        withSamsungGalleryAvailability(
+                            current.copy(
+                                overlayItems = updatedItems,
+                                editedInGalleryIds = edited,
+                                externalEditSession = null,
+                                pendingExternalEditIntent = null,
+                                currentIndex = resolveCurrentIndexAfterRangeChange(
+                                    items = filteredItems,
+                                    currentId = current.currentItem?.image?.id,
+                                    kept = current.keptImageIds,
+                                    marked = current.markedForTrashIds,
+                                    moved = current.movedToTrashIds,
+                                    edited = edited
+                                ),
+                                error = null
+                            )
+                        )
+                    } else {
+                        withSamsungGalleryAvailability(
+                            current.copy(
+                                overlayItems = updatedItems,
+                                externalEditSession = null,
+                                pendingExternalEditIntent = null,
+                                error = "No changes were detected in Samsung Gallery."
+                            )
+                        )
+                    }
+                }
+            }
+        }
     }
 
     fun updateReviewScoreRange(minScore: Float, maxScore: Float) {
@@ -260,17 +295,18 @@ class OverlayReviewViewModel @Inject constructor(
                 maxScore = rangeMax
             )
             val currentId = state.currentItem?.image?.id
-            state.copy(
-                minOverlayScore = rangeMin,
-                maxOverlayScore = rangeMax,
-                currentIndex = resolveCurrentIndexAfterRangeChange(
-                    items = filteredItems,
-                    currentId = currentId,
-                    kept = state.keptImageIds,
-                    marked = state.markedForTrashIds,
-                    moved = state.movedToTrashIds,
-                    cleaned = state.completedCleanReplaceIds,
-                    skipped = state.skippedPreviewIds
+            withSamsungGalleryAvailability(
+                state.copy(
+                    minOverlayScore = rangeMin,
+                    maxOverlayScore = rangeMax,
+                    currentIndex = resolveCurrentIndexAfterRangeChange(
+                        items = filteredItems,
+                        currentId = currentId,
+                        kept = state.keptImageIds,
+                        marked = state.markedForTrashIds,
+                        moved = state.movedToTrashIds,
+                        edited = state.editedInGalleryIds
+                    )
                 )
             )
         }
@@ -291,35 +327,19 @@ class OverlayReviewViewModel @Inject constructor(
     }
 
     fun onDeleteConfirmationResult(granted: Boolean) {
-        val pendingState = _uiState.value
-        val pendingIds = pendingState.pendingBatchIds
-        val pendingPreviewDelete = pendingState.pendingPreviewDeleteConfirmation &&
-            pendingState.previewState != null
+        val pendingIds = _uiState.value.pendingBatchIds
         _uiState.update { it.copy(pendingDeleteIntentSender = null) }
 
         if (!granted) {
-            if (pendingPreviewDelete) {
-                _uiState.update {
-                    it.copy(
-                        pendingPreviewDeleteConfirmation = false,
-                        error = "Storage permission was not granted. Delete All was canceled."
-                    )
-                }
-            } else {
-                _uiState.update {
+            _uiState.update {
+                withSamsungGalleryAvailability(
                     it.copy(
                         isApplyingBatch = false,
                         pendingBatchIds = emptySet(),
                         error = "Storage permission was not granted. Batch move was canceled."
                     )
-                }
+                )
             }
-            return
-        }
-
-        if (pendingPreviewDelete) {
-            _uiState.update { it.copy(pendingPreviewDeleteConfirmation = false) }
-            applyPreviewDecision(OverlayPreviewDecision.DELETE_ALL)
             return
         }
 
@@ -330,110 +350,6 @@ class OverlayReviewViewModel @Inject constructor(
 
     fun clearError() {
         _uiState.update { it.copy(error = null) }
-    }
-
-    private fun applyPreviewDecision(decision: OverlayPreviewDecision) {
-        val state = _uiState.value
-        val preview = state.previewState ?: return
-        val current = state.currentItem ?: return
-
-        viewModelScope.launch {
-            val currentImage = imageRepository.getImageById(current.image.id)
-            if (currentImage == null) {
-                applyOverlayPreviewDecisionUseCase.discardPreview(preview)
-                _uiState.update {
-                    it.copy(
-                        previewState = null,
-                        error = "The image changed or no longer exists. The temporary preview was discarded."
-                    )
-                }
-                return@launch
-            }
-
-            applyOverlayPreviewDecisionUseCase(
-                image = currentImage,
-                preview = preview,
-                decision = decision
-            ).onSuccess {
-                _uiState.update { currentState ->
-                    when (decision) {
-                        OverlayPreviewDecision.KEEP_CLEANED_REPLACE_ORIGINAL -> {
-                            val cleaned = currentState.completedCleanReplaceIds + currentImage.id
-                            currentState.copy(
-                                previewState = null,
-                                pendingPreviewDeleteConfirmation = false,
-                                completedCleanReplaceIds = cleaned,
-                                currentIndex = nextUndecidedIndex(
-                                    items = currentState.filteredOverlayItems,
-                                    start = (currentState.currentIndex + 1).coerceAtLeast(0),
-                                    kept = currentState.keptImageIds,
-                                    marked = currentState.markedForTrashIds,
-                                    moved = currentState.movedToTrashIds,
-                                    cleaned = cleaned,
-                                    skipped = currentState.skippedPreviewIds
-                                )
-                            )
-                        }
-
-                        OverlayPreviewDecision.DELETE_ALL -> {
-                            val moved = currentState.movedToTrashIds + currentImage.id
-                            currentState.copy(
-                                previewState = null,
-                                pendingPreviewDeleteConfirmation = false,
-                                movedToTrashIds = moved,
-                                markedForTrashIds = currentState.markedForTrashIds - currentImage.id,
-                                currentIndex = nextUndecidedIndex(
-                                    items = currentState.filteredOverlayItems,
-                                    start = (currentState.currentIndex + 1).coerceAtLeast(0),
-                                    kept = currentState.keptImageIds,
-                                    marked = currentState.markedForTrashIds - currentImage.id,
-                                    moved = moved,
-                                    cleaned = currentState.completedCleanReplaceIds,
-                                    skipped = currentState.skippedPreviewIds
-                                )
-                            )
-                        }
-
-                        OverlayPreviewDecision.SKIP_KEEP_ORIGINAL -> {
-                            val skipped = currentState.skippedPreviewIds + currentImage.id
-                            currentState.copy(
-                                previewState = null,
-                                pendingPreviewDeleteConfirmation = false,
-                                skippedPreviewIds = skipped,
-                                currentIndex = nextUndecidedIndex(
-                                    items = currentState.filteredOverlayItems,
-                                    start = (currentState.currentIndex + 1).coerceAtLeast(0),
-                                    kept = currentState.keptImageIds,
-                                    marked = currentState.markedForTrashIds,
-                                    moved = currentState.movedToTrashIds,
-                                    cleaned = currentState.completedCleanReplaceIds,
-                                    skipped = skipped
-                                )
-                            )
-                        }
-                    }
-                }
-            }.onFailure { error ->
-                if (decision == OverlayPreviewDecision.DELETE_ALL &&
-                    error is UserConfirmationRequiredException
-                ) {
-                    _uiState.update {
-                        it.copy(
-                            pendingPreviewDeleteConfirmation = true,
-                            pendingDeleteIntentSender = error.intentSender,
-                            error = null
-                        )
-                    }
-                } else {
-                    _uiState.update {
-                        it.copy(
-                            pendingPreviewDeleteConfirmation = false,
-                            error = error.message ?: "Failed to apply preview decision."
-                        )
-                    }
-                }
-            }
-        }
     }
 
     private fun applyBatchToTrash(ids: Set<Long>) {
@@ -454,14 +370,16 @@ class OverlayReviewViewModel @Inject constructor(
             result.onSuccess {
                 val moved = resolveMovedIds(ids)
                 _uiState.update { current ->
-                    current.withMovedToTrash(moved).copy(
-                        isApplyingBatch = false,
-                        pendingBatchIds = emptySet(),
-                        error = if (moved.size < ids.size) {
-                            "Only ${moved.size} of ${ids.size} images were moved to trash."
-                        } else {
-                            null
-                        }
+                    withSamsungGalleryAvailability(
+                        current.withMovedToTrash(moved).copy(
+                            isApplyingBatch = false,
+                            pendingBatchIds = emptySet(),
+                            error = if (moved.size < ids.size) {
+                                "Only ${moved.size} of ${ids.size} images were moved to trash."
+                            } else {
+                                null
+                            }
+                        )
                     )
                 }
             }
@@ -471,22 +389,26 @@ class OverlayReviewViewModel @Inject constructor(
                 if (error is UserConfirmationRequiredException) {
                     val pendingIds = ids - moved
                     _uiState.update { current ->
-                        current.withMovedToTrash(moved).copy(
-                            isApplyingBatch = false,
-                            pendingBatchIds = pendingIds,
-                            pendingDeleteIntentSender = if (pendingIds.isNotEmpty()) {
-                                error.intentSender
-                            } else {
-                                null
-                            }
+                        withSamsungGalleryAvailability(
+                            current.withMovedToTrash(moved).copy(
+                                isApplyingBatch = false,
+                                pendingBatchIds = pendingIds,
+                                pendingDeleteIntentSender = if (pendingIds.isNotEmpty()) {
+                                    error.intentSender
+                                } else {
+                                    null
+                                }
+                            )
                         )
                     }
                 } else {
                     _uiState.update { current ->
-                        current.withMovedToTrash(moved).copy(
-                            isApplyingBatch = false,
-                            pendingBatchIds = emptySet(),
-                            error = error.message ?: "Failed to move images to trash."
+                        withSamsungGalleryAvailability(
+                            current.withMovedToTrash(moved).copy(
+                                isApplyingBatch = false,
+                                pendingBatchIds = emptySet(),
+                                error = error.message ?: "Failed to move images to trash."
+                            )
                         )
                     }
                 }
@@ -513,9 +435,17 @@ class OverlayReviewViewModel @Inject constructor(
                 kept = keptImageIds,
                 marked = marked,
                 moved = movedSet,
-                cleaned = completedCleanReplaceIds,
-                skipped = skippedPreviewIds
+                edited = editedInGalleryIds
             )
+        )
+    }
+
+    private fun withSamsungGalleryAvailability(state: OverlayReviewUiState): OverlayReviewUiState {
+        val availability = state.currentItem?.let { item ->
+            samsungGalleryEditIntentFactory.availabilityFor(item.image)
+        }
+        return state.copy(
+            samsungGalleryDisabledReason = availability?.reason
         )
     }
 
@@ -525,16 +455,14 @@ class OverlayReviewViewModel @Inject constructor(
         kept: Set<Long>,
         marked: Set<Long>,
         moved: Set<Long>,
-        cleaned: Set<Long>,
-        skipped: Set<Long>
+        edited: Set<Long>
     ): Int {
         for (index in start until items.size) {
             val id = items[index].image.id
             if (id !in kept &&
                 id !in marked &&
                 id !in moved &&
-                id !in cleaned &&
-                id !in skipped
+                id !in edited
             ) {
                 return index
             }
@@ -554,22 +482,7 @@ class OverlayReviewViewModel @Inject constructor(
 
     override fun onCleared() {
         scanJob?.cancel()
-        discardPreviewFiles(_uiState.value.previewState)
         super.onCleared()
-    }
-
-    private fun discardPreviewFiles(preview: com.duplicatefinder.domain.model.CleaningPreview?) {
-        preview ?: return
-        deletePreviewUri(preview.previewUri)
-        preview.maskUri?.let(::deletePreviewUri)
-    }
-
-    private fun deletePreviewUri(uri: Uri) {
-        if (uri.scheme == null || uri.scheme == "file") {
-            uri.path?.let { path ->
-                File(path).takeIf { it.exists() }?.delete()
-            }
-        }
     }
 }
 
@@ -579,8 +492,7 @@ internal fun resolveCurrentIndexAfterRangeChange(
     kept: Set<Long>,
     marked: Set<Long>,
     moved: Set<Long>,
-    cleaned: Set<Long>,
-    skipped: Set<Long>
+    edited: Set<Long>
 ): Int {
     val firstUndecided = nextUndecidedIndexForRangeChange(
         items = items,
@@ -588,16 +500,14 @@ internal fun resolveCurrentIndexAfterRangeChange(
         kept = kept,
         marked = marked,
         moved = moved,
-        cleaned = cleaned,
-        skipped = skipped
+        edited = edited
     )
 
     if (currentId == null ||
         currentId in kept ||
         currentId in marked ||
         currentId in moved ||
-        currentId in cleaned ||
-        currentId in skipped
+        currentId in edited
     ) {
         return firstUndecided
     }
@@ -620,19 +530,27 @@ private fun nextUndecidedIndexForRangeChange(
     kept: Set<Long>,
     marked: Set<Long>,
     moved: Set<Long>,
-    cleaned: Set<Long>,
-    skipped: Set<Long>
+    edited: Set<Long>
 ): Int {
     for (index in start until items.size) {
         val id = items[index].image.id
         if (id !in kept &&
             id !in marked &&
             id !in moved &&
-            id !in cleaned &&
-            id !in skipped
+            id !in edited
         ) {
             return index
         }
     }
     return -1
+}
+
+private fun List<OverlayReviewItem>.replaceImage(latestImage: com.duplicatefinder.domain.model.ImageItem): List<OverlayReviewItem> {
+    return map { item ->
+        if (item.image.id == latestImage.id) {
+            item.copy(image = latestImage)
+        } else {
+            item
+        }
+    }
 }

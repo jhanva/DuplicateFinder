@@ -107,27 +107,6 @@ internal object OverlayOnnxPostProcessor {
         )
     }
 
-    fun buildMask(
-        width: Int,
-        height: Int,
-        regions: List<OverlayRegion>
-    ): FloatArray {
-        if (width <= 0 || height <= 0 || regions.isEmpty()) return FloatArray(width.coerceAtLeast(0) * height.coerceAtLeast(0))
-        val mask = FloatArray(width * height)
-        regions.forEach { region ->
-            val left = (region.left.coerceIn(0f, 1f) * width).toInt().coerceIn(0, width - 1)
-            val top = (region.top.coerceIn(0f, 1f) * height).toInt().coerceIn(0, height - 1)
-            val right = (region.right.coerceIn(0f, 1f) * width).toInt().coerceIn(left + 1, width)
-            val bottom = (region.bottom.coerceIn(0f, 1f) * height).toInt().coerceIn(top + 1, height)
-            for (y in top until bottom) {
-                for (x in left until right) {
-                    mask[(y * width) + x] = 1f
-                }
-            }
-        }
-        return mask
-    }
-
     private fun decodeBoxes(
         values: FloatArray,
         confidenceThreshold: Float,

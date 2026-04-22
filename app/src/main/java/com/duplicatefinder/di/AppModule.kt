@@ -1,11 +1,12 @@
 package com.duplicatefinder.di
 
+import android.content.Intent
 import android.content.Context
-import com.duplicatefinder.data.repository.AssetOverlayCleaningBundledModelSource
-import com.duplicatefinder.data.repository.OverlayCleaningBundledModelSource
+import android.os.Build
 import com.duplicatefinder.BuildConfig
 import com.duplicatefinder.data.local.datastore.SettingsDataStore
 import com.duplicatefinder.data.media.MediaStoreDataSource
+import com.duplicatefinder.presentation.screens.overlay.SamsungGalleryEditIntentFactory
 import com.duplicatefinder.util.hash.DifferenceHashCalculator
 import com.duplicatefinder.util.hash.MD5HashCalculator
 import com.duplicatefinder.util.hash.PerceptualHashCalculator
@@ -22,8 +23,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
-    private const val OVERLAY_CLEANING_BUNDLED_ASSET_PATH = "overlay-cleaning/AOT-GAN.onnx"
-
     @Provides
     @Singleton
     fun provideSettingsDataStore(
@@ -86,31 +85,14 @@ object AppModule {
 
     @Provides
     @Singleton
-    @Named("overlayCleaningModelUrl")
-    fun provideOverlayCleaningModelUrl(): String = BuildConfig.OVERLAY_CLEANING_MODEL_URL
-
-    @Provides
-    @Singleton
-    @Named("overlayCleaningModelDir")
-    fun provideOverlayCleaningModelDir(
+    fun provideSamsungGalleryEditIntentFactory(
         @ApplicationContext context: Context
-    ): File = File(context.filesDir, "overlay_models/current").also { it.mkdirs() }
-
-    @Provides
-    @Singleton
-    fun provideOverlayCleaningBundledModelSource(
-        @ApplicationContext context: Context
-    ): OverlayCleaningBundledModelSource {
-        return AssetOverlayCleaningBundledModelSource(
-            assetManager = context.assets,
-            assetPath = OVERLAY_CLEANING_BUNDLED_ASSET_PATH
+    ): SamsungGalleryEditIntentFactory {
+        return SamsungGalleryEditIntentFactory(
+            deviceManufacturer = Build.MANUFACTURER,
+            canResolveEditIntent = { intent: Intent ->
+                intent.resolveActivity(context.packageManager) != null
+            }
         )
     }
-
-    @Provides
-    @Singleton
-    @Named("overlayPreviewDir")
-    fun provideOverlayPreviewDir(
-        @ApplicationContext context: Context
-    ): File = File(context.cacheDir, "overlay_preview").also { it.mkdirs() }
 }

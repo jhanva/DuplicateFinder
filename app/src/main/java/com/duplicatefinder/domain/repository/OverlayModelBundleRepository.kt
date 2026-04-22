@@ -28,21 +28,6 @@ enum class OverlayDetectorOutputFormat {
     }
 }
 
-enum class OverlayInpainterInputFormat {
-    IMAGE_AND_MASK,
-    CONCAT_IMAGE_MASK;
-
-    companion object {
-        fun fromManifestValue(value: String): OverlayInpainterInputFormat {
-            return when (value.trim().lowercase()) {
-                "image_and_mask", "image-and-mask" -> IMAGE_AND_MASK
-                "concat_image_mask", "concat-image-mask" -> CONCAT_IMAGE_MASK
-                else -> valueOf(value.replace('-', '_').uppercase())
-            }
-        }
-    }
-}
-
 enum class OverlayTensorRange {
     ZERO_TO_ONE,
     NEGATIVE_ONE_TO_ONE;
@@ -80,18 +65,9 @@ data class OverlayOnnxMaskRefinerContract(
     val maskThreshold: Float = 0f
 )
 
-data class OverlayOnnxInpainterContract(
-    val imageInputName: String = "image",
-    val maskInputName: String = "mask",
-    val outputName: String = "output",
-    val inputFormat: OverlayInpainterInputFormat = OverlayInpainterInputFormat.IMAGE_AND_MASK,
-    val tensorRange: OverlayTensorRange = OverlayTensorRange.ZERO_TO_ONE
-)
-
 data class OverlayOnnxRuntimeContract(
     val detector: OverlayOnnxDetectorContract = OverlayOnnxDetectorContract(),
-    val maskRefiner: OverlayOnnxMaskRefinerContract = OverlayOnnxMaskRefinerContract(),
-    val inpainter: OverlayOnnxInpainterContract = OverlayOnnxInpainterContract()
+    val maskRefiner: OverlayOnnxMaskRefinerContract = OverlayOnnxMaskRefinerContract()
 )
 
 data class OverlayModelBundleInfo(
@@ -100,10 +76,8 @@ data class OverlayModelBundleInfo(
     val textDetectorPath: String,
     val maskRefinerEncoderPath: String,
     val maskRefinerDecoderPath: String,
-    val inpainterPath: String,
     val inputSizeTextDetector: Int,
     val inputSizeMaskRefiner: Int,
-    val inputSizeInpainter: Int,
     val onnx: OverlayOnnxRuntimeContract = OverlayOnnxRuntimeContract(),
     val manifestUrl: String? = null
 ) {
@@ -111,8 +85,7 @@ data class OverlayModelBundleInfo(
         get() = listOf(
             textDetectorPath,
             maskRefinerEncoderPath,
-            maskRefinerDecoderPath,
-            inpainterPath
+            maskRefinerDecoderPath
         )
 }
 
