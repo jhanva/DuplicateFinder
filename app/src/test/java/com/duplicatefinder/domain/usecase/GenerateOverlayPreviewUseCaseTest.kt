@@ -5,6 +5,7 @@ import com.duplicatefinder.domain.BaseOverlayModelBundleRepositoryFake
 import com.duplicatefinder.domain.testImage
 import com.duplicatefinder.domain.testOverlayDetection
 import com.duplicatefinder.domain.repository.OverlayModelBundleInfo
+import com.duplicatefinder.domain.repository.OverlayModelRuntime
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -52,11 +53,13 @@ class GenerateOverlayPreviewUseCaseTest {
 
     private fun bundleInfo() = OverlayModelBundleInfo(
         bundleVersion = "test-model-v1",
-        detectorStage1Path = "stage1.tflite",
-        detectorStage2Path = "stage2.tflite",
-        inpainterPath = "inpainter.tflite",
-        inputSizeStage1 = 512,
-        inputSizeStage2 = 512,
+        runtime = OverlayModelRuntime.ONNX_RUNTIME_ANDROID,
+        textDetectorPath = "ppocrv5_mobile_det.onnx",
+        maskRefinerEncoderPath = "mobile_sam_encoder.onnx",
+        maskRefinerDecoderPath = "mobile_sam_decoder.onnx",
+        inpainterPath = "aot_gan.onnx",
+        inputSizeTextDetector = 512,
+        inputSizeMaskRefiner = 512,
         inputSizeInpainter = 1024
     )
 }

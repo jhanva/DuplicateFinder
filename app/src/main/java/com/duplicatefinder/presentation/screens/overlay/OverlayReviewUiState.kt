@@ -23,6 +23,7 @@ data class OverlayReviewUiState(
     val completedCleanReplaceIds: Set<Long> = emptySet(),
     val skippedPreviewIds: Set<Long> = emptySet(),
     val pendingBatchIds: Set<Long> = emptySet(),
+    val pendingPreviewDeleteConfirmation: Boolean = false,
     val pendingDeleteIntentSender: IntentSender? = null,
     val previewState: CleaningPreview? = null,
     val requiresFolderSelection: Boolean = false,

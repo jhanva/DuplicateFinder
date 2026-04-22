@@ -1,7 +1,15 @@
 package com.duplicatefinder.data.repository
 
 import com.duplicatefinder.domain.repository.OverlayModelBundleInfo
+import com.duplicatefinder.domain.repository.OverlayOnnxDetectorContract
+import com.duplicatefinder.domain.repository.OverlayOnnxMaskRefinerContract
+import com.duplicatefinder.domain.repository.OverlayOnnxInpainterContract
+import com.duplicatefinder.domain.repository.OverlayOnnxRuntimeContract
+import com.duplicatefinder.domain.repository.OverlayDetectorOutputFormat
+import com.duplicatefinder.domain.repository.OverlayInpainterInputFormat
+import com.duplicatefinder.domain.repository.OverlayModelRuntime
 import com.duplicatefinder.domain.repository.OverlayModelBundleRepository
+import com.duplicatefinder.domain.repository.OverlayTensorRange
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -48,9 +56,9 @@ class OverlayModelBundleRepositoryImpl @Inject constructor(
             val writtenFiles = mutableListOf<File>()
 
             try {
-                writtenFiles += downloadAsset(bundleInfo.detectorStage1Path)
-                writtenFiles += downloadAsset(bundleInfo.detectorStage2Path)
-                writtenFiles += downloadAsset(bundleInfo.inpainterPath)
+                bundleInfo.requiredAssetPaths.forEach { assetPath ->
+                    writtenFiles += downloadAsset(assetPath)
+                }
 
                 if (!isBundleComplete(bundleInfo)) {
                     throw IllegalStateException("Overlay model bundle is incomplete after download.")
@@ -124,23 +132,116 @@ class OverlayModelBundleRepositoryImpl @Inject constructor(
         val json = JSONObject(this)
         return OverlayModelBundleInfo(
             bundleVersion = json.optString("bundleVersion", "overlay-bundle-v1"),
-            detectorStage1Path = json.getString("detectorStage1Path"),
-            detectorStage2Path = json.getString("detectorStage2Path"),
+            runtime = json.optString("runtime")
+                .takeIf { it.isNotBlank() }
+                ?.let(OverlayModelRuntime::fromManifestValue)
+                ?: OverlayModelRuntime.ONNX_RUNTIME_ANDROID,
+            textDetectorPath = json.optString("textDetectorPath")
+                .takeIf { it.isNotBlank() }
+                ?: json.getString("detectorStage1Path"),
+            maskRefinerEncoderPath = json.optString("maskRefinerEncoderPath")
+                .takeIf { it.isNotBlank() }
+                ?: json.getString("detectorStage2Path"),
+            maskRefinerDecoderPath = json.optString("maskRefinerDecoderPath")
+                .takeIf { it.isNotBlank() }
+                ?: json.getString("detectorStage2Path"),
             inpainterPath = json.getString("inpainterPath"),
-            inputSizeStage1 = json.optInt("inputSizeStage1", 512),
-            inputSizeStage2 = json.optInt("inputSizeStage2", 512),
+            inputSizeTextDetector = json.optInt(
+                "inputSizeTextDetector",
+                json.optInt("inputSizeStage1", 512)
+            ),
+            inputSizeMaskRefiner = json.optInt(
+                "inputSizeMaskRefiner",
+                json.optInt("inputSizeStage2", 512)
+            ),
             inputSizeInpainter = json.optInt("inputSizeInpainter", 1024),
+            onnx = json.optJSONObject("onnx").toOnnxRuntimeContract(),
             manifestUrl = defaultManifestUrl
         )
     }
 
-    private fun isBundleComplete(bundleInfo: OverlayModelBundleInfo): Boolean {
-        val requiredFiles = listOf(
-            bundleInfo.detectorStage1Path,
-            bundleInfo.detectorStage2Path,
-            bundleInfo.inpainterPath
+    private fun JSONObject?.toOnnxRuntimeContract(): OverlayOnnxRuntimeContract {
+        val detectorJson = this?.optJSONObject("detector")
+        val maskRefinerJson = this?.optJSONObject("maskRefiner")
+        val inpainterJson = this?.optJSONObject("inpainter")
+        return OverlayOnnxRuntimeContract(
+            detector = OverlayOnnxDetectorContract(
+                inputName = detectorJson?.optString("inputName")
+                    .takeUnless { it.isNullOrBlank() }
+                    ?: "image",
+                outputName = detectorJson?.optString("outputName")
+                    .takeUnless { it.isNullOrBlank() }
+                    ?: "output",
+                outputFormat = detectorJson?.optString("outputFormat")
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let(OverlayDetectorOutputFormat::fromManifestValue)
+                    ?: OverlayDetectorOutputFormat.HEATMAP,
+                confidenceThreshold = detectorJson?.optDouble("confidenceThreshold", 0.45)
+                    ?.toFloat()
+                    ?: 0.45f,
+                minRegionAreaRatio = detectorJson?.optDouble("minRegionAreaRatio", 0.0025)
+                    ?.toFloat()
+                    ?: 0.0025f
+            ),
+            maskRefiner = OverlayOnnxMaskRefinerContract(
+                encoderInputName = maskRefinerJson?.optString("encoderInputName")
+                    .takeUnless { it.isNullOrBlank() }
+                    ?: "image",
+                encoderOutputName = maskRefinerJson?.optString("encoderOutputName")
+                    .takeUnless { it.isNullOrBlank() }
+                    ?: "image_embeddings",
+                decoderEmbeddingInputName = maskRefinerJson?.optString("decoderEmbeddingInputName")
+                    .takeUnless { it.isNullOrBlank() }
+                    ?: "image_embeddings",
+                decoderPointCoordsInputName = maskRefinerJson?.optString("decoderPointCoordsInputName")
+                    .takeUnless { it.isNullOrBlank() }
+                    ?: "point_coords",
+                decoderPointLabelsInputName = maskRefinerJson?.optString("decoderPointLabelsInputName")
+                    .takeUnless { it.isNullOrBlank() }
+                    ?: "point_labels",
+                decoderMaskInputName = maskRefinerJson?.optString("decoderMaskInputName")
+                    .takeUnless { it.isNullOrBlank() }
+                    ?: "mask_input",
+                decoderHasMaskInputName = maskRefinerJson?.optString("decoderHasMaskInputName")
+                    .takeUnless { it.isNullOrBlank() }
+                    ?: "has_mask_input",
+                decoderOrigImSizeInputName = maskRefinerJson?.optString("decoderOrigImSizeInputName")
+                    .takeUnless { it.isNullOrBlank() }
+                    ?: "orig_im_size",
+                decoderOutputName = maskRefinerJson?.optString("decoderOutputName")
+                    .takeUnless { it.isNullOrBlank() }
+                    ?: "masks",
+                decoderScoreOutputName = maskRefinerJson?.optString("decoderScoreOutputName")
+                    .takeUnless { it.isNullOrBlank() }
+                    ?: "iou_predictions",
+                maskThreshold = maskRefinerJson?.optDouble("maskThreshold", 0.0)
+                    ?.toFloat()
+                    ?: 0f
+            ),
+            inpainter = OverlayOnnxInpainterContract(
+                imageInputName = inpainterJson?.optString("imageInputName")
+                    .takeUnless { it.isNullOrBlank() }
+                    ?: "image",
+                maskInputName = inpainterJson?.optString("maskInputName")
+                    .takeUnless { it.isNullOrBlank() }
+                    ?: "mask",
+                outputName = inpainterJson?.optString("outputName")
+                    .takeUnless { it.isNullOrBlank() }
+                    ?: "output",
+                inputFormat = inpainterJson?.optString("inputFormat")
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let(OverlayInpainterInputFormat::fromManifestValue)
+                    ?: OverlayInpainterInputFormat.IMAGE_AND_MASK,
+                tensorRange = inpainterJson?.optString("tensorRange")
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let(OverlayTensorRange::fromManifestValue)
+                    ?: OverlayTensorRange.ZERO_TO_ONE
+            )
         )
-        return requiredFiles.all { path ->
+    }
+
+    private fun isBundleComplete(bundleInfo: OverlayModelBundleInfo): Boolean {
+        return bundleInfo.requiredAssetPaths.all { path ->
             File(bundleDir, path.substringAfterLast('/')).let { file ->
                 file.exists() && file.length() > 0L
             }

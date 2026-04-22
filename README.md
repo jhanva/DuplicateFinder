@@ -119,19 +119,6 @@ app/src/main/java/com/duplicatefinder/
 - **Min SDK**: 26 (Android 8.0)
 - **Target SDK**: 34 (Android 14)
 
-## Shared Codex Skills
-
-This repository is configured to reuse the shared Codex skill library from the sibling repository `../ai-skills`.
-
-- `.agents/skills` is a junction to the shared skill catalog.
-- `.codex/agents` is a junction to the shared custom agent catalog.
-- `.codex/config.toml` is copied locally from the shared repository.
-
-If the shared repository is moved, the links are missing, or you want to recreate the setup on another machine, run:
-
-```powershell
-.\scripts\setup-shared-codex-skills.ps1
-```
 - **Device Baseline (Validated)**: Samsung Galaxy S23 Ultra
 - **Intended Devices**: S23 Ultra-class devices and newer (or equivalent/high-end hardware)
 - **Performance Note**: Older devices may run, but the app is optimized and documented for S23 Ultra and above
@@ -299,9 +286,6 @@ This repository uses a direct-to-`main` workflow.
 - Use Conventional Commits for commits and optional PR titles
 - Run the relevant checks before pushing
 - Bump `versionName` and `versionCode` only for release/versioning work
-
-The full repository workflow, versioning rules, and merge policy live in `AGENTS.md`.
-
 ## Author
 
 **jhanva** - [GitHub](https://github.com/jhanva)

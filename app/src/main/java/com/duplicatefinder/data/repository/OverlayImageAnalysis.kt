@@ -7,7 +7,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
-internal data class OverlayAnalysisResult(
+data class OverlayAnalysisResult(
     val preliminaryScore: Float,
     val refinedScore: Float,
     val overlayCoverageRatio: Float,

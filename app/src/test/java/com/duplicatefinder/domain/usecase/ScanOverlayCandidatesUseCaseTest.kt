@@ -1,7 +1,10 @@
 package com.duplicatefinder.domain.usecase
 
 import com.duplicatefinder.domain.BaseImageRepositoryFake
+import com.duplicatefinder.domain.BaseOverlayModelBundleRepositoryFake
 import com.duplicatefinder.domain.BaseOverlayRepositoryFake
+import com.duplicatefinder.domain.repository.OverlayModelBundleInfo
+import com.duplicatefinder.domain.repository.OverlayModelRuntime
 import com.duplicatefinder.domain.testImage
 import com.duplicatefinder.domain.testOverlayDetection
 import kotlinx.coroutines.flow.toList
@@ -42,6 +45,7 @@ class ScanOverlayCandidatesUseCaseTest {
         val states = ScanOverlayCandidatesUseCase(
             imageRepository,
             overlayRepository,
+            BaseOverlayModelBundleRepositoryFake(),
             StandardTestDispatcher(testScheduler)
         )
             .invoke(folders = setOf("Camera"), reviewThreshold = 0.0f)
@@ -72,6 +76,7 @@ class ScanOverlayCandidatesUseCaseTest {
         ScanOverlayCandidatesUseCase(
             imageRepository,
             overlayRepository,
+            BaseOverlayModelBundleRepositoryFake(),
             StandardTestDispatcher(testScheduler)
         )
             .invoke(folders = setOf("Camera"))
@@ -107,6 +112,7 @@ class ScanOverlayCandidatesUseCaseTest {
         val states = ScanOverlayCandidatesUseCase(
             imageRepository,
             overlayRepository,
+            BaseOverlayModelBundleRepositoryFake(),
             StandardTestDispatcher(testScheduler)
         )
             .invoke(folders = setOf("Camera"), reviewThreshold = 0.60f)
@@ -114,5 +120,53 @@ class ScanOverlayCandidatesUseCaseTest {
 
         assertTrue(states.last().items.all { it.rankScore >= 0.60f })
         assertEquals(listOf(2L), states.last().items.map { it.image.id })
+    }
+
+    @Test
+    fun `scan uses active overlay bundle version when available`() = runTest {
+        val images = listOf(testImage(id = 1, size = 100))
+        val imageRepository = object : BaseImageRepositoryFake() {
+            override suspend fun getImageCount(folders: Set<String>): Int = images.size
+            override suspend fun getImagesBatch(
+                folders: Set<String>,
+                limit: Int,
+                offset: Int
+            ) = images
+        }
+        val overlayRepository = object : BaseOverlayRepositoryFake() {
+            var lastModelVersion: String? = null
+
+            override suspend fun detectOverlayCandidates(
+                images: List<com.duplicatefinder.domain.model.ImageItem>,
+                modelVersion: String
+            ): List<com.duplicatefinder.domain.model.OverlayDetection> {
+                lastModelVersion = modelVersion
+                return super.detectOverlayCandidates(images, modelVersion)
+            }
+        }
+        val bundleRepository = BaseOverlayModelBundleRepositoryFake().apply {
+            activeBundleInfo = OverlayModelBundleInfo(
+                bundleVersion = "overlay-bundle-v9",
+                runtime = OverlayModelRuntime.ONNX_RUNTIME_ANDROID,
+                textDetectorPath = "det.onnx",
+                maskRefinerEncoderPath = "enc.onnx",
+                maskRefinerDecoderPath = "dec.onnx",
+                inpainterPath = "inp.onnx",
+                inputSizeTextDetector = 512,
+                inputSizeMaskRefiner = 512,
+                inputSizeInpainter = 1024
+            )
+        }
+
+        ScanOverlayCandidatesUseCase(
+            imageRepository,
+            overlayRepository,
+            bundleRepository,
+            StandardTestDispatcher(testScheduler)
+        )
+            .invoke(folders = setOf("Camera"))
+            .toList()
+
+        assertEquals("overlay-bundle-v9", overlayRepository.lastModelVersion)
     }
 }

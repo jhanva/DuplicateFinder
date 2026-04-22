@@ -10,6 +10,8 @@ import com.duplicatefinder.domain.model.OverlayDetection
 import com.duplicatefinder.domain.model.OverlayPreviewDecision
 import com.duplicatefinder.domain.model.OverlayRegion
 import com.duplicatefinder.domain.model.PreviewStatus
+import com.duplicatefinder.domain.model.overlayPreviewDecodeMaxDimension
+import com.duplicatefinder.domain.model.supportsOverlayCleaning
 import com.duplicatefinder.domain.repository.OverlayCleaningRepository
 import com.duplicatefinder.domain.repository.OverlayModelBundleInfo
 import com.duplicatefinder.domain.repository.TrashRepository
@@ -28,6 +30,7 @@ import kotlin.math.max
 class OverlayCleaningRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val trashRepository: TrashRepository,
+    private val overlayOnnxRuntime: OverlayOnnxRuntime,
     @Named("overlayPreviewDir") private val previewDir: File,
     @Named("overlayModelBundleDir") private val bundleDir: File
 ) : OverlayCleaningRepository {
@@ -40,14 +43,23 @@ class OverlayCleaningRepositoryImpl @Inject constructor(
         val startedAt = System.currentTimeMillis()
         val previewFile = createPreviewFile(image, bundleInfo.bundleVersion)
         runCatching {
+            if (!image.supportsOverlayCleaning()) {
+                throw IOException("Remove Watermark is not supported for ${image.mimeType}.")
+            }
             ensureBundleAvailable(bundleInfo)
             previewDir.mkdirs()
 
             val sourceBitmap = decodePreviewBitmap(
                 image = image,
-                maxDimension = bundleInfo.inputSizeInpainter.coerceAtLeast(MIN_PREVIEW_DIMENSION)
+                maxDimension = image.overlayPreviewDecodeMaxDimension(
+                    bundleInfo.inputSizeInpainter.coerceAtLeast(MIN_PREVIEW_DIMENSION)
+                )
             ) ?: throw IOException("Unable to decode source image for preview generation.")
-            val cleanedBitmap = renderPreviewBitmap(sourceBitmap, detection.maskBounds)
+            val cleanedBitmap = renderPreviewBitmap(
+                sourceBitmap = sourceBitmap,
+                regions = detection.maskBounds,
+                bundleInfo = bundleInfo
+            )
 
             FileOutputStream(previewFile).use { output ->
                 if (!cleanedBitmap.compress(compressFormatFor(image), PREVIEW_QUALITY, output)) {
@@ -133,9 +145,13 @@ class OverlayCleaningRepositoryImpl @Inject constructor(
         image: ImageItem,
         preview: CleaningPreview
     ): Result<Unit> = withContext(Dispatchers.IO) {
-        discardPreview(preview).getOrElse { return@withContext Result.failure(it) }
         trashRepository.moveToTrash(listOf(image)).fold(
-            onSuccess = { Result.success(Unit) },
+            onSuccess = {
+                discardPreview(preview).fold(
+                    onSuccess = { Result.success(Unit) },
+                    onFailure = { Result.failure(it) }
+                )
+            },
             onFailure = { Result.failure(it) }
         )
     }
@@ -147,12 +163,7 @@ class OverlayCleaningRepositoryImpl @Inject constructor(
     }
 
     private fun ensureBundleAvailable(bundleInfo: OverlayModelBundleInfo) {
-        val requiredPaths = listOf(
-            bundleInfo.detectorStage1Path,
-            bundleInfo.detectorStage2Path,
-            bundleInfo.inpainterPath
-        )
-        val missingFiles = requiredPaths.filterNot { relativePath ->
+        val missingFiles = bundleInfo.requiredAssetPaths.filterNot { relativePath ->
             File(bundleDir, relativePath.substringAfterLast('/')).let { file ->
                 file.exists() && file.length() > 0L
             }
@@ -186,37 +197,16 @@ class OverlayCleaningRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun renderPreviewBitmap(
+    internal fun renderPreviewBitmap(
         sourceBitmap: Bitmap,
-        regions: List<OverlayRegion>
+        regions: List<OverlayRegion>,
+        bundleInfo: OverlayModelBundleInfo
     ): Bitmap {
-        val mutableBitmap = sourceBitmap.copy(Bitmap.Config.ARGB_8888, true)
-        val pixels = IntArray(mutableBitmap.width * mutableBitmap.height)
-        mutableBitmap.getPixels(
-            pixels,
-            0,
-            mutableBitmap.width,
-            0,
-            0,
-            mutableBitmap.width,
-            mutableBitmap.height
+        return overlayOnnxRuntime.inpaint(
+            sourceBitmap = sourceBitmap,
+            regions = regions,
+            bundleInfo = bundleInfo
         )
-        val cleanedPixels = OverlayImageAnalysis.cleanOverlay(
-            pixels = pixels,
-            width = mutableBitmap.width,
-            height = mutableBitmap.height,
-            regions = regions
-        )
-        mutableBitmap.setPixels(
-            cleanedPixels,
-            0,
-            mutableBitmap.width,
-            0,
-            0,
-            mutableBitmap.width,
-            mutableBitmap.height
-        )
-        return mutableBitmap
     }
 
     private fun createBackup(image: ImageItem, backupFile: File) {

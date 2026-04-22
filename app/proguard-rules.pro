@@ -9,3 +9,4 @@
 
 # Keep Room entities
 -keep class com.duplicatefinder.data.local.db.entities.** { *; }
+-keep class ai.onnxruntime.** { *; }

@@ -22,6 +22,7 @@ import com.duplicatefinder.domain.model.TrashItem
 import com.duplicatefinder.domain.repository.ImageRepository
 import com.duplicatefinder.domain.repository.OverlayCleaningRepository
 import com.duplicatefinder.domain.repository.OverlayModelBundleInfo
+import com.duplicatefinder.domain.repository.OverlayModelRuntime
 import com.duplicatefinder.domain.repository.OverlayModelBundleRepository
 import com.duplicatefinder.domain.repository.OverlayRepository
 import com.duplicatefinder.domain.repository.QualityRepository

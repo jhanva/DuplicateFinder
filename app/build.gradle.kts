@@ -108,10 +108,8 @@ dependencies {
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    // TensorFlow Lite
-    implementation("org.tensorflow:tensorflow-lite:2.16.1")
-    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
-    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
+    // ONNX Runtime Android
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.23.2")
 
     // Testing
     testImplementation("junit:junit:4.13.2")

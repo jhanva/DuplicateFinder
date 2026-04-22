@@ -56,6 +56,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.duplicatefinder.R
 import com.duplicatefinder.domain.model.OverlayReviewItem
+import com.duplicatefinder.domain.model.supportsOverlayCleaning
 import com.duplicatefinder.presentation.components.ReviewEmptyState
 import com.duplicatefinder.presentation.components.ReviewNoFilterMatchesContent
 import com.duplicatefinder.presentation.components.ReviewSummaryContent
@@ -550,7 +551,7 @@ private fun OverlayReviewContent(
 
             Button(
                 onClick = onGeneratePreview,
-                enabled = !isPaused,
+                enabled = !isPaused && item.image.supportsOverlayCleaning(),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(

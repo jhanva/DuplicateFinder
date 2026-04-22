@@ -7,6 +7,7 @@ import com.duplicatefinder.domain.model.OverlayPreviewDecision
 import com.duplicatefinder.domain.model.OverlayReviewItem
 import com.duplicatefinder.domain.model.ScanPhase
 import com.duplicatefinder.domain.model.UserConfirmationRequiredException
+import com.duplicatefinder.domain.model.supportsOverlayCleaning
 import com.duplicatefinder.domain.repository.ImageRepository
 import com.duplicatefinder.domain.repository.SettingsRepository
 import com.duplicatefinder.domain.usecase.ApplyOverlayPreviewDecisionUseCase
@@ -62,6 +63,7 @@ class OverlayReviewViewModel @Inject constructor(
                         completedCleanReplaceIds = emptySet(),
                         skippedPreviewIds = emptySet(),
                         pendingBatchIds = emptySet(),
+                        pendingPreviewDeleteConfirmation = false,
                         pendingDeleteIntentSender = null,
                         previewState = null
                     )
@@ -189,6 +191,14 @@ class OverlayReviewViewModel @Inject constructor(
         val state = _uiState.value
         if (state.isPaused || state.isGeneratingPreview) return
         val current = state.currentItem ?: return
+        if (!current.image.supportsOverlayCleaning()) {
+            _uiState.update {
+                it.copy(
+                    error = "Remove Watermark is not supported for ${current.image.mimeType} files."
+                )
+            }
+            return
+        }
 
         viewModelScope.launch {
             _uiState.update {
@@ -281,17 +291,35 @@ class OverlayReviewViewModel @Inject constructor(
     }
 
     fun onDeleteConfirmationResult(granted: Boolean) {
-        val pendingIds = _uiState.value.pendingBatchIds
+        val pendingState = _uiState.value
+        val pendingIds = pendingState.pendingBatchIds
+        val pendingPreviewDelete = pendingState.pendingPreviewDeleteConfirmation &&
+            pendingState.previewState != null
         _uiState.update { it.copy(pendingDeleteIntentSender = null) }
 
         if (!granted) {
-            _uiState.update {
-                it.copy(
-                    isApplyingBatch = false,
-                    pendingBatchIds = emptySet(),
-                    error = "Storage permission was not granted. Batch move was canceled."
-                )
+            if (pendingPreviewDelete) {
+                _uiState.update {
+                    it.copy(
+                        pendingPreviewDeleteConfirmation = false,
+                        error = "Storage permission was not granted. Delete All was canceled."
+                    )
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        isApplyingBatch = false,
+                        pendingBatchIds = emptySet(),
+                        error = "Storage permission was not granted. Batch move was canceled."
+                    )
+                }
             }
+            return
+        }
+
+        if (pendingPreviewDelete) {
+            _uiState.update { it.copy(pendingPreviewDeleteConfirmation = false) }
+            applyPreviewDecision(OverlayPreviewDecision.DELETE_ALL)
             return
         }
 
@@ -333,6 +361,7 @@ class OverlayReviewViewModel @Inject constructor(
                             val cleaned = currentState.completedCleanReplaceIds + currentImage.id
                             currentState.copy(
                                 previewState = null,
+                                pendingPreviewDeleteConfirmation = false,
                                 completedCleanReplaceIds = cleaned,
                                 currentIndex = nextUndecidedIndex(
                                     items = currentState.filteredOverlayItems,
@@ -350,6 +379,7 @@ class OverlayReviewViewModel @Inject constructor(
                             val moved = currentState.movedToTrashIds + currentImage.id
                             currentState.copy(
                                 previewState = null,
+                                pendingPreviewDeleteConfirmation = false,
                                 movedToTrashIds = moved,
                                 markedForTrashIds = currentState.markedForTrashIds - currentImage.id,
                                 currentIndex = nextUndecidedIndex(
@@ -368,6 +398,7 @@ class OverlayReviewViewModel @Inject constructor(
                             val skipped = currentState.skippedPreviewIds + currentImage.id
                             currentState.copy(
                                 previewState = null,
+                                pendingPreviewDeleteConfirmation = false,
                                 skippedPreviewIds = skipped,
                                 currentIndex = nextUndecidedIndex(
                                     items = currentState.filteredOverlayItems,
@@ -383,8 +414,23 @@ class OverlayReviewViewModel @Inject constructor(
                     }
                 }
             }.onFailure { error ->
-                _uiState.update {
-                    it.copy(error = error.message ?: "Failed to apply preview decision.")
+                if (decision == OverlayPreviewDecision.DELETE_ALL &&
+                    error is UserConfirmationRequiredException
+                ) {
+                    _uiState.update {
+                        it.copy(
+                            pendingPreviewDeleteConfirmation = true,
+                            pendingDeleteIntentSender = error.intentSender,
+                            error = null
+                        )
+                    }
+                } else {
+                    _uiState.update {
+                        it.copy(
+                            pendingPreviewDeleteConfirmation = false,
+                            error = error.message ?: "Failed to apply preview decision."
+                        )
+                    }
                 }
             }
         }

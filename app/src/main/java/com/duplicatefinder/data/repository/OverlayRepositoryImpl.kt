@@ -10,6 +10,7 @@ import com.duplicatefinder.domain.model.ImageItem
 import com.duplicatefinder.domain.model.OverlayDetection
 import com.duplicatefinder.domain.model.OverlayKind
 import com.duplicatefinder.domain.model.OverlayRegion
+import com.duplicatefinder.domain.repository.OverlayModelBundleRepository
 import com.duplicatefinder.domain.repository.OverlayRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +25,9 @@ import javax.inject.Singleton
 class OverlayRepositoryImpl @Inject constructor(
     private val overlayDetectionDao: OverlayDetectionDao,
     @ApplicationContext private val context: Context,
-    private val mediaStoreDataSource: MediaStoreDataSource
+    private val mediaStoreDataSource: MediaStoreDataSource,
+    private val overlayModelBundleRepository: OverlayModelBundleRepository,
+    private val overlayOnnxRuntime: OverlayOnnxRuntime
 ) : OverlayRepository {
 
     override suspend fun getCachedDetections(
@@ -52,7 +55,9 @@ class OverlayRepositoryImpl @Inject constructor(
         images: List<ImageItem>,
         modelVersion: String
     ): List<OverlayDetection> = withContext(Dispatchers.Default) {
-        images.map { image -> detectOverlay(image, modelVersion) }
+        val activeBundle = overlayModelBundleRepository.getActiveBundleInfo()
+            ?.takeIf { it.bundleVersion == modelVersion }
+        images.map { image -> detectOverlay(image, modelVersion, activeBundle) }
     }
 
     override suspend fun saveDetections(detections: List<OverlayDetection>) {
@@ -79,13 +84,21 @@ class OverlayRepositoryImpl @Inject constructor(
 
     private fun detectOverlay(
         image: ImageItem,
-        modelVersion: String
+        modelVersion: String,
+        activeBundle: com.duplicatefinder.domain.repository.OverlayModelBundleInfo?
     ): OverlayDetection {
-        val analysis = runCatching { analyzeImageContent(image) }.getOrDefault(OverlayImageAnalysis.analyze(
-            pixels = IntArray(MIN_ANALYSIS_DIMENSION * MIN_ANALYSIS_DIMENSION) { DEFAULT_PIXEL },
-            width = MIN_ANALYSIS_DIMENSION,
-            height = MIN_ANALYSIS_DIMENSION
-        ))
+        val analysis = runCatching {
+            analyzeImageContent(
+                image = image,
+                activeBundle = activeBundle
+            )
+        }.getOrDefault(
+            OverlayImageAnalysis.analyze(
+                pixels = IntArray(MIN_ANALYSIS_DIMENSION * MIN_ANALYSIS_DIMENSION) { DEFAULT_PIXEL },
+                width = MIN_ANALYSIS_DIMENSION,
+                height = MIN_ANALYSIS_DIMENSION
+            )
+        )
 
         return OverlayDetection(
             image = image,
@@ -100,9 +113,31 @@ class OverlayRepositoryImpl @Inject constructor(
         )
     }
 
-    private fun analyzeImageContent(image: ImageItem): OverlayAnalysisResult {
+    private fun analyzeImageContent(
+        image: ImageItem,
+        activeBundle: com.duplicatefinder.domain.repository.OverlayModelBundleInfo?
+    ): OverlayAnalysisResult {
         val bitmap = decodeAnalysisBitmap(image)
             ?: throw IOException("Unable to decode bitmap for overlay analysis.")
+        return try {
+            analyzeBitmap(bitmap, activeBundle)
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
+    internal fun analyzeBitmap(
+        bitmap: android.graphics.Bitmap,
+        activeBundle: com.duplicatefinder.domain.repository.OverlayModelBundleInfo?
+    ): OverlayAnalysisResult {
+        return if (activeBundle != null) {
+            overlayOnnxRuntime.analyze(bitmap, activeBundle)
+        } else {
+            fallbackAnalyze(bitmap)
+        }
+    }
+
+    private fun fallbackAnalyze(bitmap: android.graphics.Bitmap): OverlayAnalysisResult {
         val pixels = IntArray(bitmap.width * bitmap.height)
         bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
         return OverlayImageAnalysis.analyze(

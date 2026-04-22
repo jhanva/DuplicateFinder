@@ -6,6 +6,7 @@ import com.duplicatefinder.domain.model.OverlayScanState
 import com.duplicatefinder.domain.model.ScanPhase
 import com.duplicatefinder.domain.model.ScanProgress
 import com.duplicatefinder.domain.repository.ImageRepository
+import com.duplicatefinder.domain.repository.OverlayModelBundleRepository
 import com.duplicatefinder.domain.repository.OverlayRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -16,15 +17,17 @@ import javax.inject.Inject
 
 class ScanOverlayCandidatesUseCase @Inject constructor(
     private val imageRepository: ImageRepository,
-    private val overlayRepository: OverlayRepository
+    private val overlayRepository: OverlayRepository,
+    private val overlayModelBundleRepository: OverlayModelBundleRepository
 ) {
     private var ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 
     constructor(
         imageRepository: ImageRepository,
         overlayRepository: OverlayRepository,
+        overlayModelBundleRepository: OverlayModelBundleRepository,
         ioDispatcher: CoroutineDispatcher
-    ) : this(imageRepository, overlayRepository) {
+    ) : this(imageRepository, overlayRepository, overlayModelBundleRepository) {
         this.ioDispatcher = ioDispatcher
     }
 
@@ -34,6 +37,11 @@ class ScanOverlayCandidatesUseCase @Inject constructor(
         modelVersion: String = DEFAULT_MODEL_VERSION,
         reviewThreshold: Float = DEFAULT_REVIEW_THRESHOLD
     ): Flow<OverlayScanState> = flow {
+        val resolvedModelVersion = overlayModelBundleRepository.getActiveBundleInfo()
+            ?.bundleVersion
+            ?.takeIf { it.isNotBlank() }
+            ?: modelVersion
+
         emit(
             OverlayScanState(
                 progress = ScanProgress(ScanPhase.LOADING, 0, 0),
@@ -78,14 +86,14 @@ class ScanOverlayCandidatesUseCase @Inject constructor(
 
             val cached = overlayRepository.getCachedDetections(
                 imageIds = batch.map { it.id },
-                modelVersion = modelVersion
+                modelVersion = resolvedModelVersion
             )
 
             val missing = batch.filter { it.id !in cached }
             val freshDetections = if (missing.isNotEmpty()) {
                 overlayRepository.detectOverlayCandidates(
                     images = missing,
-                    modelVersion = modelVersion
+                    modelVersion = resolvedModelVersion
                 )
             } else {
                 emptyList()

@@ -54,10 +54,10 @@ captures/
 .vscode/
 .vs/
 
-# Shared Codex integration
-.agents/
-.codex/
-scripts/setup-shared-codex-skills.ps1
+# Shared Codex content comes from ../ai-skills through local Windows junctions.
+# Ignore the linked directories here to avoid duplicating upstream files in this repo.
+.agents/skills/
+.codex/agents/
 
 # Keystore files
 # Uncomment the following lines if you do not want to check your keystore files in.
