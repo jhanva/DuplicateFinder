@@ -1,6 +1,8 @@
 package com.duplicatefinder.di
 
 import android.content.Context
+import com.duplicatefinder.data.repository.AssetOverlayCleaningBundledModelSource
+import com.duplicatefinder.data.repository.OverlayCleaningBundledModelSource
 import com.duplicatefinder.BuildConfig
 import com.duplicatefinder.data.local.datastore.SettingsDataStore
 import com.duplicatefinder.data.media.MediaStoreDataSource
@@ -20,6 +22,7 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
+    private const val OVERLAY_CLEANING_BUNDLED_ASSET_PATH = "overlay-cleaning/AOT-GAN.onnx"
 
     @Provides
     @Singleton
@@ -80,6 +83,29 @@ object AppModule {
     fun provideOverlayModelBundleDir(
         @ApplicationContext context: Context
     ): File = File(context.filesDir, "overlay_models/current").also { it.mkdirs() }
+
+    @Provides
+    @Singleton
+    @Named("overlayCleaningModelUrl")
+    fun provideOverlayCleaningModelUrl(): String = BuildConfig.OVERLAY_CLEANING_MODEL_URL
+
+    @Provides
+    @Singleton
+    @Named("overlayCleaningModelDir")
+    fun provideOverlayCleaningModelDir(
+        @ApplicationContext context: Context
+    ): File = File(context.filesDir, "overlay_models/current").also { it.mkdirs() }
+
+    @Provides
+    @Singleton
+    fun provideOverlayCleaningBundledModelSource(
+        @ApplicationContext context: Context
+    ): OverlayCleaningBundledModelSource {
+        return AssetOverlayCleaningBundledModelSource(
+            assetManager = context.assets,
+            assetPath = OVERLAY_CLEANING_BUNDLED_ASSET_PATH
+        )
+    }
 
     @Provides
     @Singleton

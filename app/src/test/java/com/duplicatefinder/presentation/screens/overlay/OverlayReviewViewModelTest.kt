@@ -3,6 +3,7 @@ package com.duplicatefinder.presentation.screens.overlay
 import android.content.IntentSender
 import com.duplicatefinder.domain.BaseImageRepositoryFake
 import com.duplicatefinder.domain.BaseOverlayCleaningRepositoryFake
+import com.duplicatefinder.domain.BaseOverlayCleaningModelRepositoryFake
 import com.duplicatefinder.domain.BaseOverlayModelBundleRepositoryFake
 import com.duplicatefinder.domain.BaseOverlayRepositoryFake
 import com.duplicatefinder.domain.BaseTrashRepositoryFake
@@ -16,6 +17,7 @@ import com.duplicatefinder.domain.testOverlayDetection
 import com.duplicatefinder.domain.repository.OverlayModelBundleInfo
 import com.duplicatefinder.domain.repository.OverlayModelRuntime
 import com.duplicatefinder.domain.usecase.ApplyOverlayPreviewDecisionUseCase
+import com.duplicatefinder.domain.usecase.EnsureOverlayCleaningModelUseCase
 import com.duplicatefinder.domain.usecase.EnsureOverlayModelBundleUseCase
 import com.duplicatefinder.domain.usecase.GenerateOverlayPreviewUseCase
 import com.duplicatefinder.domain.usecase.MoveToTrashUseCase
@@ -123,17 +125,10 @@ class OverlayReviewViewModelTest {
             ) = listOf(testOverlayDetection(image, score = 0.95f, modelVersion = modelVersion))
         }
         val bundleRepository = BaseOverlayModelBundleRepositoryFake().apply {
-            activeBundleInfo = OverlayModelBundleInfo(
-                bundleVersion = "test-model-v1",
-                runtime = OverlayModelRuntime.ONNX_RUNTIME_ANDROID,
-                textDetectorPath = "ppocrv5_mobile_det.onnx",
-                maskRefinerEncoderPath = "mobile_sam_encoder.onnx",
-                maskRefinerDecoderPath = "mobile_sam_decoder.onnx",
-                inpainterPath = "aot_gan.onnx",
-                inputSizeTextDetector = 512,
-                inputSizeMaskRefiner = 512,
-                inputSizeInpainter = 1024
-            )
+            activeBundleInfo = overlayBundleInfo()
+        }
+        val cleaningModelRepository = BaseOverlayCleaningModelRepositoryFake().apply {
+            activeModelInfo = cleaningModelInfo()
         }
         val cleaningRepository = BaseOverlayCleaningRepositoryFake()
         val viewModel = OverlayReviewViewModel(
@@ -148,7 +143,7 @@ class OverlayReviewViewModelTest {
                 dispatcher
             ),
             generateOverlayPreviewUseCase = GenerateOverlayPreviewUseCase(
-                ensureOverlayModelBundleUseCase = EnsureOverlayModelBundleUseCase(bundleRepository),
+                ensureOverlayCleaningModelUseCase = EnsureOverlayCleaningModelUseCase(cleaningModelRepository),
                 overlayCleaningRepository = cleaningRepository
             ),
             applyOverlayPreviewDecisionUseCase = ApplyOverlayPreviewDecisionUseCase(cleaningRepository),
@@ -312,17 +307,10 @@ class OverlayReviewViewModelTest {
         cleaningRepository: BaseOverlayCleaningRepositoryFake = BaseOverlayCleaningRepositoryFake()
     ): OverlayReviewViewModel {
         val bundleRepository = BaseOverlayModelBundleRepositoryFake().apply {
-            activeBundleInfo = OverlayModelBundleInfo(
-                bundleVersion = "test-model-v1",
-                runtime = OverlayModelRuntime.ONNX_RUNTIME_ANDROID,
-                textDetectorPath = "ppocrv5_mobile_det.onnx",
-                maskRefinerEncoderPath = "mobile_sam_encoder.onnx",
-                maskRefinerDecoderPath = "mobile_sam_decoder.onnx",
-                inpainterPath = "aot_gan.onnx",
-                inputSizeTextDetector = 512,
-                inputSizeMaskRefiner = 512,
-                inputSizeInpainter = 1024
-            )
+            activeBundleInfo = overlayBundleInfo()
+        }
+        val cleaningModelRepository = BaseOverlayCleaningModelRepositoryFake().apply {
+            activeModelInfo = cleaningModelInfo()
         }
 
         return OverlayReviewViewModel(
@@ -335,11 +323,35 @@ class OverlayReviewViewModelTest {
                 dispatcher
             ),
             generateOverlayPreviewUseCase = GenerateOverlayPreviewUseCase(
-                ensureOverlayModelBundleUseCase = EnsureOverlayModelBundleUseCase(bundleRepository),
+                ensureOverlayCleaningModelUseCase = EnsureOverlayCleaningModelUseCase(cleaningModelRepository),
                 overlayCleaningRepository = cleaningRepository
             ),
             applyOverlayPreviewDecisionUseCase = ApplyOverlayPreviewDecisionUseCase(cleaningRepository),
             moveToTrashUseCase = MoveToTrashUseCase(object : BaseTrashRepositoryFake() {})
         )
     }
+
+    private fun overlayBundleInfo() = OverlayModelBundleInfo(
+        bundleVersion = "test-model-v1",
+        runtime = OverlayModelRuntime.ONNX_RUNTIME_ANDROID,
+        textDetectorPath = "ppocrv5_mobile_det.onnx",
+        maskRefinerEncoderPath = "mobile_sam_encoder.onnx",
+        maskRefinerDecoderPath = "mobile_sam_decoder.onnx",
+        inpainterPath = "aot_gan.onnx",
+        inputSizeTextDetector = 512,
+        inputSizeMaskRefiner = 512,
+        inputSizeInpainter = 1024
+    )
+
+    private fun cleaningModelInfo() = OverlayModelBundleInfo(
+        bundleVersion = "overlay-cleaning-aot-gan-v1",
+        runtime = OverlayModelRuntime.ONNX_RUNTIME_ANDROID,
+        textDetectorPath = "",
+        maskRefinerEncoderPath = "",
+        maskRefinerDecoderPath = "",
+        inpainterPath = "AOT-GAN.onnx",
+        inputSizeTextDetector = 0,
+        inputSizeMaskRefiner = 0,
+        inputSizeInpainter = 512
+    )
 }

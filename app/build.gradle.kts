@@ -1,3 +1,5 @@
+import java.net.URL
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -12,6 +14,46 @@ val overlayModelManifestUrl = providers.gradleProperty("overlayModelManifestUrl"
     .replace("\\", "\\\\")
     .replace("\"", "\\\"")
 
+val overlayCleaningModelUrl = providers.gradleProperty("overlayCleaningModelUrl")
+    .orElse(providers.environmentVariable("OVERLAY_CLEANING_MODEL_URL"))
+    .orElse("https://huggingface.co/qualcomm/AOT-GAN/resolve/2a8a8af2619d9c734a2ecaaf9d702b3f0646a708/AOT-GAN.onnx")
+    .get()
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+
+val overlayCleaningBundledAssetPath = "overlay-cleaning/AOT-GAN.onnx"
+val overlayCleaningGeneratedAssetsDir = layout.buildDirectory.dir("generated/assets/overlay-cleaning")
+
+val prepareOverlayCleaningModelAsset by tasks.registering {
+    val outputFile = overlayCleaningGeneratedAssetsDir.map { it.file(overlayCleaningBundledAssetPath) }
+    inputs.property("overlayCleaningModelUrl", overlayCleaningModelUrl)
+    outputs.file(outputFile)
+
+    doLast {
+        if (overlayCleaningModelUrl.isBlank()) {
+            throw GradleException("OVERLAY_CLEANING_MODEL_URL is required to package the offline cleaning model.")
+        }
+
+        val targetFile = outputFile.get().asFile
+        if (targetFile.exists() && targetFile.length() > 0L) return@doLast
+
+        targetFile.parentFile.mkdirs()
+        URL(overlayCleaningModelUrl).openStream().use { input ->
+            targetFile.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+
+        if (!targetFile.exists() || targetFile.length() <= 0L) {
+            throw GradleException("Failed to package bundled overlay cleaning model asset.")
+        }
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(prepareOverlayCleaningModelAsset)
+}
+
 android {
     namespace = "com.duplicatefinder"
     compileSdk = 34
@@ -23,6 +65,7 @@ android {
         versionCode = 4
         versionName = "1.1.0"
         buildConfigField("String", "OVERLAY_MODEL_MANIFEST_URL", "\"$overlayModelManifestUrl\"")
+        buildConfigField("String", "OVERLAY_CLEANING_MODEL_URL", "\"$overlayCleaningModelUrl\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -66,6 +109,8 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    sourceSets.getByName("main").assets.srcDir(overlayCleaningGeneratedAssetsDir)
 }
 
 dependencies {

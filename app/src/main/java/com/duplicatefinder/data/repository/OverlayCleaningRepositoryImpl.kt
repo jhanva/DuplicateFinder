@@ -32,7 +32,7 @@ class OverlayCleaningRepositoryImpl @Inject constructor(
     private val trashRepository: TrashRepository,
     private val overlayOnnxRuntime: OverlayOnnxRuntime,
     @Named("overlayPreviewDir") private val previewDir: File,
-    @Named("overlayModelBundleDir") private val bundleDir: File
+    @Named("overlayCleaningModelDir") private val bundleDir: File
 ) : OverlayCleaningRepository {
 
     override suspend fun generatePreview(
@@ -163,13 +163,11 @@ class OverlayCleaningRepositoryImpl @Inject constructor(
     }
 
     private fun ensureBundleAvailable(bundleInfo: OverlayModelBundleInfo) {
-        val missingFiles = bundleInfo.requiredAssetPaths.filterNot { relativePath ->
-            File(bundleDir, relativePath.substringAfterLast('/')).let { file ->
-                file.exists() && file.length() > 0L
-            }
-        }
-        if (missingFiles.isNotEmpty()) {
-            throw IOException("Overlay model bundle is incomplete or missing.")
+        val requiredPath = bundleInfo.inpainterPath.takeIf { it.isNotBlank() }
+            ?: throw IOException("Overlay cleaning model is missing.")
+        val modelFile = File(bundleDir, requiredPath.substringAfterLast('/'))
+        if (!modelFile.exists() || modelFile.length() <= 0L) {
+            throw IOException("Overlay cleaning model is incomplete or missing.")
         }
     }
 

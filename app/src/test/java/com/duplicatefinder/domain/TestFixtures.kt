@@ -24,6 +24,7 @@ import com.duplicatefinder.domain.repository.OverlayCleaningRepository
 import com.duplicatefinder.domain.repository.OverlayModelBundleInfo
 import com.duplicatefinder.domain.repository.OverlayModelRuntime
 import com.duplicatefinder.domain.repository.OverlayModelBundleRepository
+import com.duplicatefinder.domain.repository.OverlayCleaningModelRepository
 import com.duplicatefinder.domain.repository.OverlayRepository
 import com.duplicatefinder.domain.repository.QualityRepository
 import com.duplicatefinder.domain.repository.SettingsRepository
@@ -268,6 +269,24 @@ open class BaseOverlayCleaningRepositoryFake : OverlayCleaningRepository {
     override suspend fun discardPreview(preview: CleaningPreview): Result<Unit> {
         discardCallCount += 1
         return Result.success(Unit)
+    }
+}
+
+open class BaseOverlayCleaningModelRepositoryFake : OverlayCleaningModelRepository {
+    var activeModelInfo: OverlayModelBundleInfo? = null
+    var downloadConfigured: Boolean = false
+    var downloadResult: Result<OverlayModelBundleInfo> = Result.failure(
+        IllegalStateException("Cleaning model download not configured")
+    )
+    var downloadCallCount: Int = 0
+
+    override fun isDownloadConfigured(): Boolean = downloadConfigured
+
+    override suspend fun getActiveModelInfo(): OverlayModelBundleInfo? = activeModelInfo
+
+    override suspend fun downloadModel(): Result<OverlayModelBundleInfo> {
+        downloadCallCount += 1
+        return downloadResult
     }
 }
 

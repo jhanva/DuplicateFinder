@@ -6,7 +6,7 @@ import com.duplicatefinder.domain.repository.OverlayCleaningRepository
 import javax.inject.Inject
 
 class GenerateOverlayPreviewUseCase @Inject constructor(
-    private val ensureOverlayModelBundleUseCase: EnsureOverlayModelBundleUseCase,
+    private val ensureOverlayCleaningModelUseCase: EnsureOverlayCleaningModelUseCase,
     private val overlayCleaningRepository: OverlayCleaningRepository
 ) {
 
@@ -14,17 +14,17 @@ class GenerateOverlayPreviewUseCase @Inject constructor(
         detection: OverlayDetection,
         allowDownload: Boolean
     ): Result<CleaningPreview> {
-        val bundleResult = ensureOverlayModelBundleUseCase(allowDownload = allowDownload)
-        val bundleInfo = bundleResult.bundleInfo ?: return Result.failure(
+        val modelResult = ensureOverlayCleaningModelUseCase(allowDownload = allowDownload)
+        val modelInfo = modelResult.modelInfo ?: return Result.failure(
             IllegalStateException(
-                bundleResult.errorMessage ?: "Overlay model bundle is not available."
+                modelResult.errorMessage ?: "Overlay cleaning model is not available."
             )
         )
 
         return overlayCleaningRepository.generatePreview(
             image = detection.image,
             detection = detection,
-            bundleInfo = bundleInfo
+            bundleInfo = modelInfo
         )
     }
 }
