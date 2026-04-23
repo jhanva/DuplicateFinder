@@ -1,0 +1,4 @@
+interface:
+  display_name: "Android APK Build"
+  short_description: "Compile APKs with a stable Gradle flow"
+  default_prompt: "Use $android-apk-build to compile the APK for this Android project with the standard verified flow."

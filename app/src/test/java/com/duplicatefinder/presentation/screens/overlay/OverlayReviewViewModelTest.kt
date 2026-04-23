@@ -33,7 +33,8 @@ import org.mockito.Mockito
 class OverlayReviewViewModelTest {
     private val requiredMessage = "Requires Samsung Gallery AI editing on a supported Samsung device."
     private val advisoryMessage =
-        "Opens Samsung Gallery. Object Eraser availability depends on your device and Gallery version."
+        "Opens the image in Samsung Gallery. Tap Edit in Gallery to use AI tools like Object Eraser."
+    private val launchFailedMessage = "Samsung Gallery could not be opened for this image."
     private val noChangesMessage = "No changes were detected in Samsung Gallery."
 
     private val dispatcher = StandardTestDispatcher()
@@ -98,8 +99,12 @@ class OverlayReviewViewModelTest {
         val state = viewModel.uiState.value
         val session = state.externalEditSession
 
-        assertNotNull(state.pendingExternalEditIntent)
-        assertEquals("com.sec.android.gallery3d", state.pendingExternalEditIntent?.`package`)
+        assertEquals(8, state.pendingExternalEditRequest?.specs?.size)
+        assertEquals(image.mimeType, state.pendingExternalEditRequest?.specs?.firstOrNull()?.mimeType)
+        assertEquals(
+            "com.samsung.android.gallery.app.activity.GalleryActivity",
+            state.pendingExternalEditRequest?.specs?.firstOrNull()?.className
+        )
         assertTrue(state.canOpenInSamsungGallery)
         assertEquals(advisoryMessage, state.samsungGalleryHelperText)
         assertEquals(image.id, session?.imageId)
@@ -159,7 +164,7 @@ class OverlayReviewViewModelTest {
         assertEquals(setOf(originalImage.id), state.editedInGalleryIds)
         assertEquals(nextImage.id, state.currentItem?.image?.id)
         assertEquals(null, state.externalEditSession)
-        assertEquals(null, state.pendingExternalEditIntent)
+        assertEquals(null, state.pendingExternalEditRequest)
         assertTrue(imageByIdCalls >= 3)
     }
 
@@ -198,7 +203,45 @@ class OverlayReviewViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(emptySet<Long>(), state.editedInGalleryIds)
         assertEquals(image.id, state.currentItem?.image?.id)
+        assertEquals(null, state.pendingExternalEditRequest)
         assertEquals(noChangesMessage, state.error)
+    }
+
+    @Test
+    fun `launch failure clears external edit session and reports gallery open error`() = runTest(dispatcher) {
+        val image = testImage(id = 1, size = 100)
+        val imageRepository = object : BaseImageRepositoryFake() {
+            override suspend fun getImageCount(folders: Set<String>): Int = 1
+            override suspend fun getImagesBatch(
+                folders: Set<String>,
+                limit: Int,
+                offset: Int
+            ) = listOf(image)
+            override suspend fun getImageById(id: Long) = image.takeIf { it.id == id }
+            override suspend fun getImagesByIds(ids: List<Long>) = listOf(image).filter { it.id in ids }
+        }
+        val overlayRepository = object : BaseOverlayRepositoryFake() {
+            override suspend fun detectOverlayCandidates(
+                images: List<com.duplicatefinder.domain.model.ImageItem>,
+                modelVersion: String
+            ) = listOf(testOverlayDetection(image, score = 0.95f, modelVersion = modelVersion))
+        }
+        val viewModel = createViewModel(
+            imageRepository = imageRepository,
+            overlayRepository = overlayRepository
+        )
+
+        viewModel.startReview()
+        advanceUntilIdle()
+        viewModel.openCurrentInSamsungGallery()
+        advanceUntilIdle()
+        viewModel.onExternalEditorLaunchFailed()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(null, state.externalEditSession)
+        assertEquals(null, state.pendingExternalEditRequest)
+        assertEquals(launchFailedMessage, state.error)
     }
 
     @Test
@@ -270,7 +313,7 @@ class OverlayReviewViewModelTest {
             deviceManufacturer = "samsung",
             requiredMessage = requiredMessage,
             advisoryMessage = advisoryMessage,
-            canResolveEditIntent = { true }
+            isSamsungGalleryInstalled = { true }
         ),
         trashRepository: BaseTrashRepositoryFake = object : BaseTrashRepositoryFake() {}
     ): OverlayReviewViewModel {
@@ -288,6 +331,7 @@ class OverlayReviewViewModelTest {
                 dispatcher
             ),
             samsungGalleryEditIntentFactory = samsungGalleryEditIntentFactory,
+            samsungGalleryLaunchFailedMessage = launchFailedMessage,
             noGalleryChangesMessage = noChangesMessage,
             moveToTrashUseCase = MoveToTrashUseCase(trashRepository)
         )

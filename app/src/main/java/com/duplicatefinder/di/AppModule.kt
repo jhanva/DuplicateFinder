@@ -1,6 +1,5 @@
 package com.duplicatefinder.di
 
-import android.content.Intent
 import android.content.Context
 import android.os.Build
 import com.duplicatefinder.R
@@ -107,6 +106,13 @@ object AppModule {
 
     @Provides
     @Singleton
+    @Named("overlaySamsungGalleryLaunchFailedMessage")
+    fun provideOverlaySamsungGalleryLaunchFailedMessage(
+        @ApplicationContext context: Context
+    ): String = context.getString(R.string.overlay_samsung_gallery_launch_failed)
+
+    @Provides
+    @Singleton
     fun provideSamsungGalleryEditIntentFactory(
         @ApplicationContext context: Context,
         @Named("overlaySamsungGalleryRequiredMessage") requiredMessage: String,
@@ -116,8 +122,17 @@ object AppModule {
             deviceManufacturer = Build.MANUFACTURER,
             requiredMessage = requiredMessage,
             advisoryMessage = advisoryMessage,
-            canResolveEditIntent = { intent: Intent ->
-                intent.resolveActivity(context.packageManager) != null
+            isSamsungGalleryInstalled = {
+                try {
+                    @Suppress("DEPRECATION")
+                    context.packageManager.getPackageInfo(
+                        SamsungGalleryEditIntentFactory.SAMSUNG_GALLERY_PACKAGE,
+                        0
+                    )
+                    true
+                } catch (_: Exception) {
+                    false
+                }
             }
         )
     }

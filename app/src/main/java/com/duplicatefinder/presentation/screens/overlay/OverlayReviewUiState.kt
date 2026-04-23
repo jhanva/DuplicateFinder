@@ -1,6 +1,5 @@
 package com.duplicatefinder.presentation.screens.overlay
 
-import android.content.Intent
 import android.content.IntentSender
 import com.duplicatefinder.domain.model.OverlayReviewItem
 import com.duplicatefinder.domain.model.ScanProgress
@@ -21,7 +20,7 @@ data class OverlayReviewUiState(
     val pendingBatchIds: Set<Long> = emptySet(),
     val pendingDeleteIntentSender: IntentSender? = null,
     val externalEditSession: OverlayExternalEditSession? = null,
-    val pendingExternalEditIntent: Intent? = null,
+    val pendingExternalEditRequest: SamsungGalleryLaunchRequest? = null,
     val canOpenInSamsungGallery: Boolean = false,
     val samsungGalleryHelperText: String? = null,
     val requiresFolderSelection: Boolean = false,

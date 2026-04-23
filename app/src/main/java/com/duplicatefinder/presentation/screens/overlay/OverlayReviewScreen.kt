@@ -1,6 +1,7 @@
 package com.duplicatefinder.presentation.screens.overlay
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -93,10 +94,24 @@ fun OverlayReviewScreen(
         }
     }
 
-    uiState.pendingExternalEditIntent?.let { intent ->
-        LaunchedEffect(intent) {
+    uiState.pendingExternalEditRequest?.let { request ->
+        LaunchedEffect(request) {
             viewModel.onExternalEditorLaunchConsumed()
-            samsungGalleryLauncher.launch(intent)
+            var launched = false
+            for (spec in request.specs) {
+                try {
+                    samsungGalleryLauncher.launch(spec.toIntent(request.image))
+                    launched = true
+                    break
+                } catch (_: ActivityNotFoundException) {
+                    // Try the next Samsung Gallery intent shape before failing the action.
+                } catch (_: IllegalArgumentException) {
+                    // Some devices reject specific URI/MIME combinations up front.
+                }
+            }
+            if (!launched) {
+                viewModel.onExternalEditorLaunchFailed()
+            }
         }
     }
 

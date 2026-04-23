@@ -27,6 +27,8 @@ class OverlayReviewViewModel @Inject constructor(
     private val imageRepository: ImageRepository,
     private val scanOverlayCandidatesUseCase: ScanOverlayCandidatesUseCase,
     private val samsungGalleryEditIntentFactory: SamsungGalleryEditIntentFactory,
+    @Named("overlaySamsungGalleryLaunchFailedMessage")
+    private val samsungGalleryLaunchFailedMessage: String,
     @Named("overlayNoGalleryChangesMessage")
     private val noGalleryChangesMessage: String,
     private val moveToTrashUseCase: MoveToTrashUseCase
@@ -60,7 +62,7 @@ class OverlayReviewViewModel @Inject constructor(
                         pendingBatchIds = emptySet(),
                         pendingDeleteIntentSender = null,
                         externalEditSession = null,
-                        pendingExternalEditIntent = null,
+                        pendingExternalEditRequest = null,
                         canOpenInSamsungGallery = false,
                         samsungGalleryHelperText = null
                     )
@@ -213,7 +215,7 @@ class OverlayReviewViewModel @Inject constructor(
                         originalDateModified = current.image.dateModified,
                         startedAt = System.currentTimeMillis()
                     ),
-                    pendingExternalEditIntent = samsungGalleryEditIntentFactory.createIntent(current.image),
+                    pendingExternalEditRequest = samsungGalleryEditIntentFactory.createLaunchRequest(current.image),
                     error = null
                 )
             )
@@ -221,7 +223,19 @@ class OverlayReviewViewModel @Inject constructor(
     }
 
     fun onExternalEditorLaunchConsumed() {
-        _uiState.update { it.copy(pendingExternalEditIntent = null) }
+        _uiState.update { it.copy(pendingExternalEditRequest = null) }
+    }
+
+    fun onExternalEditorLaunchFailed() {
+        _uiState.update {
+            withSamsungGalleryAvailability(
+                it.copy(
+                    externalEditSession = null,
+                    pendingExternalEditRequest = null,
+                    error = samsungGalleryLaunchFailedMessage
+                )
+            )
+        }
     }
 
     fun onExternalEditorResult() {
@@ -234,7 +248,7 @@ class OverlayReviewViewModel @Inject constructor(
                     withSamsungGalleryAvailability(
                         current.copy(
                             externalEditSession = null,
-                            pendingExternalEditIntent = null,
+                            pendingExternalEditRequest = null,
                             error = "The image changed or no longer exists."
                         )
                     )
@@ -255,7 +269,7 @@ class OverlayReviewViewModel @Inject constructor(
                                 overlayItems = updatedItems,
                                 editedInGalleryIds = edited,
                                 externalEditSession = null,
-                                pendingExternalEditIntent = null,
+                                pendingExternalEditRequest = null,
                                 currentIndex = resolveCurrentIndexAfterRangeChange(
                                     items = filteredItems,
                                     currentId = current.currentItem?.image?.id,
@@ -272,7 +286,7 @@ class OverlayReviewViewModel @Inject constructor(
                             current.copy(
                                 overlayItems = updatedItems,
                                 externalEditSession = null,
-                                pendingExternalEditIntent = null,
+                                pendingExternalEditRequest = null,
                                 error = noGalleryChangesMessage
                             )
                         )

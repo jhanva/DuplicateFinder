@@ -1,6 +1,5 @@
 package com.duplicatefinder.presentation.screens.overlay
 
-import android.content.Intent
 import com.duplicatefinder.domain.testImage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -10,7 +9,7 @@ import org.junit.Test
 class SamsungGalleryEditIntentFactoryTest {
     private val requiredMessage = "Requires Samsung Gallery AI editing on a supported Samsung device."
     private val advisoryMessage =
-        "Opens Samsung Gallery. Object Eraser availability depends on your device and Gallery version."
+        "Opens the image in Samsung Gallery. Tap Edit in Gallery to use AI tools like Object Eraser."
 
     @Test
     fun `availability includes advisory note on supported samsung devices`() {
@@ -18,7 +17,7 @@ class SamsungGalleryEditIntentFactoryTest {
             deviceManufacturer = "samsung",
             requiredMessage = requiredMessage,
             advisoryMessage = advisoryMessage,
-            canResolveEditIntent = { true }
+            isSamsungGalleryInstalled = { true }
         )
 
         val availability = factory.availabilityFor(testImage(id = 1, size = 100))
@@ -33,7 +32,7 @@ class SamsungGalleryEditIntentFactoryTest {
             deviceManufacturer = "google",
             requiredMessage = requiredMessage,
             advisoryMessage = advisoryMessage,
-            canResolveEditIntent = { true }
+            isSamsungGalleryInstalled = { true }
         )
 
         val availability = factory.availabilityFor(testImage(id = 1, size = 100))
@@ -43,12 +42,27 @@ class SamsungGalleryEditIntentFactoryTest {
     }
 
     @Test
-    fun `availability is disabled when samsung gallery cannot resolve edit intent`() {
+    fun `availability stays enabled when samsung gallery is installed`() {
         val factory = SamsungGalleryEditIntentFactory(
             deviceManufacturer = "samsung",
             requiredMessage = requiredMessage,
             advisoryMessage = advisoryMessage,
-            canResolveEditIntent = { false }
+            isSamsungGalleryInstalled = { true }
+        )
+
+        val availability = factory.availabilityFor(testImage(id = 1, size = 100))
+
+        assertTrue(availability.enabled)
+        assertEquals(advisoryMessage, availability.helperText)
+    }
+
+    @Test
+    fun `availability is disabled when samsung gallery package is not installed`() {
+        val factory = SamsungGalleryEditIntentFactory(
+            deviceManufacturer = "samsung",
+            requiredMessage = requiredMessage,
+            advisoryMessage = advisoryMessage,
+            isSamsungGalleryInstalled = { false }
         )
 
         val availability = factory.availabilityFor(testImage(id = 1, size = 100))
@@ -58,22 +72,73 @@ class SamsungGalleryEditIntentFactoryTest {
     }
 
     @Test
-    fun `create intent targets samsung gallery with edit permissions`() {
+    fun `create launch specs prefer samsung gallery viewer first and preserve image mime type`() {
         val image = testImage(id = 1, size = 100)
         val factory = SamsungGalleryEditIntentFactory(
             deviceManufacturer = "samsung",
             requiredMessage = requiredMessage,
             advisoryMessage = advisoryMessage,
-            canResolveEditIntent = { true }
+            isSamsungGalleryInstalled = { true }
         )
 
-        val intent = factory.createIntent(image)
+        val specs = factory.createLaunchSpecs(image)
 
-        assertEquals(Intent.ACTION_EDIT, intent.action)
-        assertEquals(image.uri, intent.data)
-        assertEquals(image.mimeType, intent.type)
-        assertEquals("com.sec.android.gallery3d", intent.`package`)
-        assertTrue(intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
-        assertTrue(intent.flags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION != 0)
+        assertEquals("android.intent.action.VIEW", specs.first().action)
+        assertEquals(image.mimeType, specs.first().mimeType)
+        assertEquals("com.samsung.android.gallery.app.activity.GalleryActivity", specs.first().className)
+    }
+
+    @Test
+    fun `create launch specs includes samsung gallery viewer fallbacks`() {
+        val image = testImage(id = 1, size = 100)
+        val factory = SamsungGalleryEditIntentFactory(
+            deviceManufacturer = "samsung",
+            requiredMessage = requiredMessage,
+            advisoryMessage = advisoryMessage,
+            isSamsungGalleryInstalled = { true }
+        )
+
+        val specs = factory.createLaunchSpecs(image)
+
+        assertEquals(8, specs.size)
+        assertEquals(
+            listOf(
+                "android.intent.action.VIEW",
+                "android.intent.action.VIEW",
+                "android.intent.action.VIEW",
+                "android.intent.action.VIEW",
+                "android.intent.action.VIEW",
+                "android.intent.action.VIEW",
+                "android.intent.action.VIEW",
+                "android.intent.action.VIEW"
+            ),
+            specs.map { it.action }
+        )
+        assertEquals(
+            listOf(
+                image.mimeType,
+                "image/*",
+                image.mimeType,
+                "image/*",
+                image.mimeType,
+                "image/*",
+                image.mimeType,
+                "image/*"
+            ),
+            specs.map { it.mimeType }
+        )
+        assertEquals(
+            listOf(
+                "com.samsung.android.gallery.app.activity.GalleryActivity",
+                "com.samsung.android.gallery.app.activity.GalleryActivity",
+                "com.sec.android.gallery3d.app.GalleryOpaqueActivity",
+                "com.sec.android.gallery3d.app.GalleryOpaqueActivity",
+                "com.sec.android.gallery3d.app.Gallery",
+                "com.sec.android.gallery3d.app.Gallery",
+                null,
+                null
+            ),
+            specs.map { it.className }
+        )
     }
 }
