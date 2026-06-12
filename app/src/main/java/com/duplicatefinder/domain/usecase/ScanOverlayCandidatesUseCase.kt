@@ -85,7 +85,7 @@ class ScanOverlayCandidatesUseCase @Inject constructor(
             if (batch.isEmpty()) break
 
             val cached = overlayRepository.getCachedDetections(
-                imageIds = batch.map { it.id },
+                images = batch,
                 modelVersion = resolvedModelVersion
             )
 
@@ -102,8 +102,11 @@ class ScanOverlayCandidatesUseCase @Inject constructor(
                 overlayRepository.saveDetections(freshDetections)
             }
 
-            collectedDetections += cached.values
-            collectedDetections += freshDetections
+            // Only candidates above the review threshold are retained in
+            // memory; with 80k+ libraries keeping every below-threshold
+            // detection (each holding an ImageItem) would dominate the heap.
+            collectedDetections += cached.values.filter { it.refinedScore >= reviewThreshold }
+            collectedDetections += freshDetections.filter { it.refinedScore >= reviewThreshold }
 
             val candidates = buildReviewItems(
                 detections = collectedDetections,

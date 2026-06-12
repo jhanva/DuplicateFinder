@@ -5,6 +5,7 @@ import com.duplicatefinder.domain.repository.OverlayModelRuntime
 import com.duplicatefinder.domain.repository.OverlayModelBundleInfo
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 class EnsureOverlayModelBundleUseCaseTest {
@@ -15,41 +16,20 @@ class EnsureOverlayModelBundleUseCaseTest {
             activeBundleInfo = bundleInfo()
         }
 
-        val result = EnsureOverlayModelBundleUseCase(repository)(allowDownload = false)
+        val result = EnsureOverlayModelBundleUseCase(repository)()
 
         assertEquals(EnsureOverlayModelBundleStatus.AVAILABLE, result.status)
+        assertEquals(bundleInfo(), result.bundleInfo)
     }
 
     @Test
-    fun `downloads bundle when missing and download is allowed`() = runBlocking {
-        val repository = BaseOverlayModelBundleRepositoryFake().apply {
-            downloadConfigured = true
-            downloadResult = Result.success(bundleInfo())
-        }
-
-        val result = EnsureOverlayModelBundleUseCase(repository)(allowDownload = true)
-
-        assertEquals(EnsureOverlayModelBundleStatus.DOWNLOADED, result.status)
-    }
-
-    @Test
-    fun `returns missing status when bundle url is not configured`() = runBlocking {
+    fun `returns missing status when bundle is not installed locally`() = runBlocking {
         val repository = BaseOverlayModelBundleRepositoryFake()
 
-        val result = EnsureOverlayModelBundleUseCase(repository)(allowDownload = false)
+        val result = EnsureOverlayModelBundleUseCase(repository)()
 
-        assertEquals(EnsureOverlayModelBundleStatus.MISSING_CONFIGURATION, result.status)
-    }
-
-    @Test
-    fun `returns missing status when download is requested but manifest is not configured`() = runBlocking {
-        val repository = BaseOverlayModelBundleRepositoryFake().apply {
-            downloadConfigured = false
-        }
-
-        val result = EnsureOverlayModelBundleUseCase(repository)(allowDownload = true)
-
-        assertEquals(EnsureOverlayModelBundleStatus.MISSING_CONFIGURATION, result.status)
+        assertEquals(EnsureOverlayModelBundleStatus.MISSING_BUNDLE, result.status)
+        assertNotNull(result.errorMessage)
     }
 
     private fun bundleInfo() = OverlayModelBundleInfo(

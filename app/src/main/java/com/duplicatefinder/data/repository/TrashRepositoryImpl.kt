@@ -52,6 +52,20 @@ class TrashRepositoryImpl @Inject constructor(
             try {
                 if (images.isEmpty()) return@withContext Result.success(0)
 
+                // Trash keeps a copy in internal storage until restore/expiry.
+                // A large batch (e.g. "select all" over an 80k library) can be
+                // many GB, so fail fast instead of filling the device mid-copy.
+                val requiredBytes = images.sumOf { it.size } + FREE_SPACE_MARGIN_BYTES
+                val usableBytes = trashDir.usableSpace
+                if (usableBytes in 1 until requiredBytes) {
+                    return@withContext Result.failure(
+                        IOException(
+                            "Not enough free storage to move ${images.size} image(s) to trash. " +
+                                "Free up space or move fewer images at once."
+                        )
+                    )
+                }
+
                 val autoDeleteDays = settingsDataStore.autoDeleteDays.first()
                 val now = System.currentTimeMillis()
                 val expiresAt = now + (autoDeleteDays * 24 * 60 * 60 * 1000L)
@@ -357,5 +371,6 @@ class TrashRepositoryImpl @Inject constructor(
 
     companion object {
         private const val TRASH_FOLDER = ".trash"
+        private const val FREE_SPACE_MARGIN_BYTES = 200L * 1024 * 1024
     }
 }

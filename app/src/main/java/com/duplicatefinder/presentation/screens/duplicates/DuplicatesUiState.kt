@@ -3,9 +3,11 @@ package com.duplicatefinder.presentation.screens.duplicates
 import android.content.IntentSender
 import com.duplicatefinder.domain.model.DuplicateGroup
 import com.duplicatefinder.domain.model.FilterCriteria
+import com.duplicatefinder.domain.model.ScanProgress
 
 data class DuplicatesUiState(
     val isLoading: Boolean = false,
+    val scanProgress: ScanProgress? = null,
     val duplicateGroups: List<DuplicateGroup> = emptyList(),
     val filteredGroups: List<DuplicateGroup> = emptyList(),
     val selectedImages: Set<Long> = emptySet(),

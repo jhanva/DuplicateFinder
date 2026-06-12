@@ -68,7 +68,7 @@ class ScanOverlayCandidatesUseCaseTest {
         }
         val overlayRepository = object : BaseOverlayRepositoryFake() {
             override suspend fun getCachedDetections(
-                imageIds: List<Long>,
+                images: List<com.duplicatefinder.domain.model.ImageItem>,
                 modelVersion: String
             ) = mapOf(cached.image.id to cached)
         }

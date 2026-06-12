@@ -50,12 +50,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.duplicatefinder.R
 import com.duplicatefinder.domain.model.TrashItem
 import com.duplicatefinder.presentation.components.ConfirmDeleteDialog
@@ -250,6 +252,9 @@ fun TrashScreen(
     }
 }
 
+// Fixed decode size for trash grid thumbnails (see ImageCard).
+private const val TRASH_THUMBNAIL_SIZE_PX = 512
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TrashItemCard(
@@ -268,7 +273,10 @@ private fun TrashItemCard(
             )
     ) {
         AsyncImage(
-            model = File(item.trashPath),
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(File(item.trashPath))
+                .size(TRASH_THUMBNAIL_SIZE_PX)
+                .build(),
             contentDescription = item.name,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()

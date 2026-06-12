@@ -1,4 +1,4 @@
-package com.duplicatefinder.data.repository
+﻿package com.duplicatefinder.data.repository
 
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
@@ -51,7 +51,7 @@ class OverlayOnnxRuntime @Inject constructor(
                 ).useResult { result ->
                     val outputTensor = result.findTensor(bundleInfo.onnx.detector.outputName)
                         ?: throw OverlayModelExecutionException(
-                            "Overlay model bundle failed during detection. Download the bundle again and retry."
+                            "Overlay model bundle failed during detection. Reinstall the overlay model bundle and retry."
                         )
                     val values = outputTensor.readFloatArray()
                     val shape = (outputTensor.info as TensorInfo).shape
@@ -94,7 +94,7 @@ class OverlayOnnxRuntime @Inject constructor(
             throw error
         } catch (error: Exception) {
             throw OverlayModelExecutionException(
-                "Overlay model bundle failed during detection. Download the bundle again and retry.",
+                "Overlay model bundle failed during detection. Reinstall the overlay model bundle and retry.",
                 error
             )
         } finally {
@@ -137,7 +137,7 @@ class OverlayOnnxRuntime @Inject constructor(
                 ).useResult { encoderResult ->
                     val embeddingTensor = encoderResult.findTensor(bundleInfo.onnx.maskRefiner.encoderOutputName)
                         ?: throw OverlayModelExecutionException(
-                            "Overlay model bundle failed during detection. Download the bundle again and retry."
+                            "Overlay model bundle failed during detection. Reinstall the overlay model bundle and retry."
                         )
                     squareRegions.flatMap { squareRegion ->
                         runMaskRefinerDecoder(
@@ -201,7 +201,7 @@ class OverlayOnnxRuntime @Inject constructor(
             ).useResult { decoderResult ->
                 val maskTensor = decoderResult.findTensor(bundleInfo.onnx.maskRefiner.decoderOutputName)
                     ?: throw OverlayModelExecutionException(
-                        "Overlay model bundle failed during detection. Download the bundle again and retry."
+                        "Overlay model bundle failed during detection. Reinstall the overlay model bundle and retry."
                     )
                 val scoreValues = decoderResult.findTensor(bundleInfo.onnx.maskRefiner.decoderScoreOutputName)
                     ?.readFloatArray()

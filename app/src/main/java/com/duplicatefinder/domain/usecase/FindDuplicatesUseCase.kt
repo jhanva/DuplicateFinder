@@ -37,33 +37,45 @@ class FindDuplicatesUseCase @Inject constructor(
     ): List<DuplicateGroup> {
         val mergedGroups = mutableListOf<DuplicateGroup>()
         val processedIds = mutableSetOf<Long>()
+        // imageId -> index in mergedGroups, so each similar group resolves its
+        // overlapping exact group in O(images) instead of scanning all groups.
+        val groupIndexByImageId = HashMap<Long, Int>()
 
         exact.forEach { group ->
+            val index = mergedGroups.size
             mergedGroups.add(group)
-            group.images.forEach { processedIds.add(it.id) }
+            group.images.forEach { image ->
+                processedIds.add(image.id)
+                groupIndexByImageId[image.id] = index
+            }
         }
 
         similar.forEach { group ->
             val newImages = group.images.filterNot { it.id in processedIds }
             if (newImages.size >= 2) {
-                val existingGroup = mergedGroups.find { existing ->
-                    existing.images.any { it.id in group.images.map { img -> img.id } }
+                val existingIndex = group.images.firstNotNullOfOrNull { image ->
+                    groupIndexByImageId[image.id]
                 }
 
-                if (existingGroup != null) {
-                    val index = mergedGroups.indexOf(existingGroup)
+                val targetIndex = if (existingIndex != null) {
+                    val existingGroup = mergedGroups[existingIndex]
                     val combinedImages = (existingGroup.images + newImages).distinctBy { it.id }
-                    val updatedGroup = existingGroup.copy(
+                    mergedGroups[existingIndex] = existingGroup.copy(
                         images = combinedImages,
                         matchType = MatchType.BOTH,
                         totalSize = combinedImages.sumOf { it.size },
                         potentialSavings = combinedImages.drop(1).sumOf { it.size }
                     )
-                    mergedGroups[index] = updatedGroup
+                    existingIndex
                 } else {
                     mergedGroups.add(group)
+                    mergedGroups.size - 1
                 }
-                newImages.forEach { processedIds.add(it.id) }
+
+                newImages.forEach { image ->
+                    processedIds.add(image.id)
+                    groupIndexByImageId[image.id] = targetIndex
+                }
             }
         }
 

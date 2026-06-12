@@ -108,9 +108,20 @@ app/src/main/java/com/duplicatefinder/
 ### Trash System
 
 - Deleted images are moved to app's internal `.trash/` folder
+- Free storage space is verified before copying a batch into trash
 - Metadata stored in Room database (original path, deletion date, expiry)
 - WorkManager runs daily to clean expired items (30 days default)
 - Users can restore or permanently delete from trash
+
+### Watermark/Overlay Review (offline model)
+
+- Detection runs fully on-device with ONNX Runtime
+- The model bundle is loaded only from local app storage
+  (`files/overlay_models/current/` with a `bundle.json` manifest); the app
+  never downloads anything
+- Without a bundle installed, a built-in heuristic analysis is used
+- Inference runs in parallel across CPU cores (tuned for S23 Ultra-class
+  devices) and results are cached in Room per model version
 
 ## Requirements
 
@@ -141,7 +152,8 @@ app/src/main/java/com/duplicatefinder/
 <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 ```
 
-**Note**: No INTERNET permission - the app is 100% offline.
+**Note**: No INTERNET permission - the app is 100% offline. This is a hard
+project rule: features must never require network access.
 
 ## Setup
 

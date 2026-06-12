@@ -27,9 +27,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.duplicatefinder.domain.model.DuplicateGroup
 import com.duplicatefinder.domain.model.MatchType
 import com.duplicatefinder.util.extension.formatFileSize
@@ -96,7 +98,10 @@ fun DuplicateGroupCard(
                             .clickable { onImageClick(image.id) }
                     ) {
                         AsyncImage(
-                            model = image.uri,
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(image.uri)
+                                .size(THUMBNAIL_SIZE_PX)
+                                .build(),
                             contentDescription = image.name,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.matchParentSize()
@@ -155,6 +160,11 @@ fun DuplicateGroupCard(
         }
     }
 }
+
+// Fixed decode size for the 80dp thumbnails: keeps every cache key identical
+// across recompositions and avoids decoding full-resolution photos for tiny
+// previews while scrolling through thousands of groups.
+private const val THUMBNAIL_SIZE_PX = 256
 
 @Composable
 private fun MatchTypeBadge(

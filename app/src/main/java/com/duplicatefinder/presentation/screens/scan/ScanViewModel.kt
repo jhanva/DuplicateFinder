@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.duplicatefinder.domain.model.ScanPhase
 import com.duplicatefinder.domain.model.ScanProgress
+import com.duplicatefinder.domain.repository.ScanResultStore
 import com.duplicatefinder.domain.repository.SettingsRepository
 import com.duplicatefinder.domain.usecase.FindDuplicatesUseCase
 import com.duplicatefinder.domain.usecase.ScanImagesUseCase
@@ -21,7 +22,8 @@ import javax.inject.Inject
 class ScanViewModel @Inject constructor(
     private val scanImagesUseCase: ScanImagesUseCase,
     private val findDuplicatesUseCase: FindDuplicatesUseCase,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val scanResultStore: ScanResultStore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ScanUiState())
@@ -69,6 +71,8 @@ class ScanViewModel @Inject constructor(
                         } else {
                             findDuplicatesUseCase(images, scanMode)
                         }
+
+                        scanResultStore.save(duplicateGroups, selectedFolders, scanMode)
 
                         val totalDuplicates = duplicateGroups.sumOf { it.imageCount - 1 }
                         val potentialSavings = duplicateGroups.sumOf { it.potentialSavings }

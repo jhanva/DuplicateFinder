@@ -2,17 +2,18 @@ package com.duplicatefinder.presentation.screens.duplicates
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.duplicatefinder.domain.model.DuplicateGroup
 import com.duplicatefinder.domain.model.FilterCriteria
-import com.duplicatefinder.domain.model.ImageHashUpdate
-import com.duplicatefinder.domain.model.ScanMode
+import com.duplicatefinder.domain.model.ScanPhase
 import com.duplicatefinder.domain.model.UserConfirmationRequiredException
-import com.duplicatefinder.domain.repository.ImageRepository
+import com.duplicatefinder.domain.repository.ScanResultStore
 import com.duplicatefinder.domain.repository.SettingsRepository
 import com.duplicatefinder.domain.usecase.FilterImagesUseCase
 import com.duplicatefinder.domain.usecase.FindDuplicatesUseCase
 import com.duplicatefinder.domain.usecase.MoveToTrashUseCase
 import com.duplicatefinder.domain.usecase.ScanImagesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,25 +24,28 @@ import javax.inject.Inject
 
 @HiltViewModel
 class DuplicatesViewModel @Inject constructor(
-    private val imageRepository: ImageRepository,
     private val settingsRepository: SettingsRepository,
     private val scanImagesUseCase: ScanImagesUseCase,
     private val findDuplicatesUseCase: FindDuplicatesUseCase,
     private val filterImagesUseCase: FilterImagesUseCase,
-    private val moveToTrashUseCase: MoveToTrashUseCase
+    private val moveToTrashUseCase: MoveToTrashUseCase,
+    private val scanResultStore: ScanResultStore
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DuplicatesUiState())
     val uiState: StateFlow<DuplicatesUiState> = _uiState.asStateFlow()
     private var pendingDeleteImageIds: Set<Long> = emptySet()
+    private var loadJob: Job? = null
 
     init {
-        loadDuplicates()
+        loadDuplicates(forceRescan = false)
     }
 
-    private fun loadDuplicates() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+    private fun loadDuplicates(forceRescan: Boolean) {
+        if (loadJob?.isActive == true) return
+
+        loadJob = viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, scanProgress = null) }
 
             try {
                 val selectedFolders = settingsRepository.scanFolders.first()
@@ -58,82 +62,64 @@ class DuplicatesViewModel @Inject constructor(
                     return@launch
                 }
 
-                val images = imageRepository.getAllImages(selectedFolders)
-                val cachedHashes = imageRepository.getCachedHashes(images.map { it.id })
                 val scanMode = settingsRepository.scanMode.first()
-                val computeSimilar = scanMode == ScanMode.EXACT_AND_SIMILAR
-                val sizeCounts = images.groupingBy { it.size }.eachCount()
-                val hashUpdates = mutableListOf<ImageHashUpdate>()
 
-                val hashedImages = images.mapNotNull { image ->
-                    val cachedHash = cachedHashes[image.id]
-                    val cacheValid = cachedHash != null &&
-                        cachedHash.dateModified == image.dateModified &&
-                        cachedHash.size == image.size
-
-                    val shouldComputeMd5 = (sizeCounts[image.size] ?: 0) > 1
-
-                    val md5 = if (cacheValid && cachedHash!!.md5Hash != null) {
-                        cachedHash.md5Hash
-                    } else if (shouldComputeMd5) {
-                        imageRepository.calculateMd5Hash(image)
-                    } else {
-                        null
+                if (!forceRescan) {
+                    val snapshot = scanResultStore.get(selectedFolders, scanMode)
+                    if (snapshot != null) {
+                        publishGroups(snapshot.groups)
+                        return@launch
                     }
+                }
 
-                    val pHash = if (computeSimilar) {
-                        if (cacheValid && cachedHash!!.perceptualHash != null) {
-                            cachedHash.perceptualHash
-                        } else {
-                            imageRepository.calculatePerceptualHash(image)
-                        }
-                    } else {
-                        null
-                    }
+                scanImagesUseCase(scanMode, selectedFolders).collect { (progress, images) ->
+                    _uiState.update { it.copy(scanProgress = progress) }
 
-                    if (md5 != null || pHash != null) {
-                        val shouldSave = !cacheValid ||
-                            (computeSimilar && cachedHash!!.perceptualHash == null && pHash != null) ||
-                            (shouldComputeMd5 && cachedHash!!.md5Hash == null && md5 != null)
-                        if (shouldSave) {
-                            hashUpdates.add(
-                                ImageHashUpdate(
-                                    image = image,
-                                    md5Hash = md5,
-                                    perceptualHash = pHash
-                                )
+                    if (progress.phase == ScanPhase.COMPLETE) {
+                        _uiState.update {
+                            it.copy(
+                                scanProgress = progress.copy(phase = ScanPhase.COMPARING)
                             )
                         }
+                        val duplicates = if (images.isEmpty()) {
+                            emptyList()
+                        } else {
+                            findDuplicatesUseCase(images, scanMode)
+                        }
+
+                        scanResultStore.save(duplicates, selectedFolders, scanMode)
+                        settingsRepository.setLastScanSummary(
+                            timestamp = System.currentTimeMillis() / 1000,
+                            duplicateCount = duplicates.sumOf { it.imageCount - 1 },
+                            potentialSavings = duplicates.sumOf { it.potentialSavings }
+                        )
+
+                        publishGroups(duplicates)
                     }
-
-                    val result = image.copy(md5Hash = md5, perceptualHash = pHash)
-                    if (md5 != null || (computeSimilar && pHash != null)) result else null
-                }
-
-                if (hashUpdates.isNotEmpty()) {
-                    imageRepository.saveHashes(hashUpdates)
-                }
-
-                val duplicates = findDuplicatesUseCase(hashedImages, scanMode)
-
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        duplicateGroups = duplicates,
-                        filteredGroups = duplicates,
-                        requiresFolderSelection = false,
-                        error = null
-                    )
                 }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
+                        scanProgress = null,
                         requiresFolderSelection = false,
                         error = e.message
                     )
                 }
             }
+        }
+    }
+
+    private fun publishGroups(duplicates: List<DuplicateGroup>) {
+        _uiState.update {
+            it.copy(
+                isLoading = false,
+                scanProgress = null,
+                duplicateGroups = duplicates,
+                filteredGroups = duplicates,
+                requiresFolderSelection = false,
+                error = null
+            )
         }
     }
 
@@ -228,6 +214,8 @@ class DuplicatesViewModel @Inject constructor(
                                 } else null
                             }
 
+                            scanResultStore.updateGroups(updatedGroups)
+
                             val filteredUpdated = filterImagesUseCase.invoke(
                                 updatedGroups,
                                 state.filterCriteria
@@ -248,7 +236,7 @@ class DuplicatesViewModel @Inject constructor(
                                 selectedImages = emptySet()
                             )
                         }
-                        loadDuplicates()
+                        loadDuplicates(forceRescan = true)
                     }
                 }
 
@@ -292,6 +280,6 @@ class DuplicatesViewModel @Inject constructor(
     }
 
     fun refresh() {
-        loadDuplicates()
+        loadDuplicates(forceRescan = true)
     }
 }

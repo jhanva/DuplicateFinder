@@ -3,7 +3,6 @@ package com.duplicatefinder.data.repository
 import android.content.Context
 import android.graphics.Bitmap
 import com.duplicatefinder.data.local.db.dao.OverlayDetectionDao
-import com.duplicatefinder.data.media.MediaStoreDataSource
 import com.duplicatefinder.domain.model.OverlayModelExecutionException
 import com.duplicatefinder.domain.repository.OverlayModelBundleInfo
 import com.duplicatefinder.domain.repository.OverlayModelRuntime
@@ -27,7 +26,6 @@ class OverlayRepositoryImplTest {
         val repository = OverlayRepositoryImpl(
             overlayDetectionDao = Mockito.mock(OverlayDetectionDao::class.java),
             context = Mockito.mock(Context::class.java),
-            mediaStoreDataSource = Mockito.mock(MediaStoreDataSource::class.java),
             overlayModelBundleRepository = Mockito.mock(OverlayModelBundleRepository::class.java),
             overlayOnnxRuntime = runtime
         )

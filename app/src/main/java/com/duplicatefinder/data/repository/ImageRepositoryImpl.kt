@@ -13,17 +13,12 @@ import com.duplicatefinder.domain.model.FilterCriteria
 import com.duplicatefinder.domain.model.ImageHashUpdate
 import com.duplicatefinder.domain.model.ImageItem
 import com.duplicatefinder.domain.model.MatchType
-import com.duplicatefinder.domain.model.ScanPhase
-import com.duplicatefinder.domain.model.ScanProgress
 import com.duplicatefinder.domain.model.UserConfirmationRequiredException
 import com.duplicatefinder.domain.repository.ImageRepository
 import com.duplicatefinder.util.hash.MD5HashCalculator
 import com.duplicatefinder.util.hash.PerceptualHashCalculator
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.UUID
@@ -52,28 +47,6 @@ class ImageRepositoryImpl @Inject constructor(
     ): List<ImageItem> {
         return mediaStoreDataSource.getImagesBatch(folders, limit, offset)
     }
-
-    override fun scanImagesWithProgress(): Flow<ScanProgress> = flow {
-        emit(ScanProgress(ScanPhase.LOADING, 0, 0))
-
-        val images = mediaStoreDataSource.getAllImages()
-        val total = images.size
-
-        emit(ScanProgress(ScanPhase.HASHING, 0, total))
-
-        images.forEachIndexed { index, image ->
-            emit(
-                ScanProgress(
-                    phase = ScanPhase.HASHING,
-                    current = index + 1,
-                    total = total,
-                    currentFile = image.name
-                )
-            )
-        }
-
-        emit(ScanProgress(ScanPhase.COMPLETE, total, total))
-    }.flowOn(Dispatchers.IO)
 
     override suspend fun getImageById(id: Long): ImageItem? {
         return mediaStoreDataSource.getImageById(id)

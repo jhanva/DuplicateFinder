@@ -11,26 +11,26 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
 
+/**
+ * Loads the overlay detection model bundle from local app storage only.
+ * The app is fully offline: the bundle ships pre-installed (sideloaded into
+ * [bundleDir] alongside a `bundle.json` manifest) and is never downloaded.
+ */
 @Singleton
 class OverlayModelBundleRepositoryImpl @Inject constructor(
-    @Named("overlayModelManifestUrl") private val manifestUrl: String,
     @Named("overlayModelBundleDir") private val bundleDir: File
 ) : OverlayModelBundleRepository {
-
-    override fun isDownloadConfigured(): Boolean = manifestUrl.isNotBlank()
 
     override suspend fun getActiveBundleInfo(): OverlayModelBundleInfo? = withContext(Dispatchers.IO) {
         val manifestFile = File(bundleDir, MANIFEST_FILE_NAME)
         if (!manifestFile.exists()) return@withContext null
 
         runCatching {
-            manifestFile.readText().toBundleInfo(manifestUrl)
+            manifestFile.readText().toBundleInfo()
                 .takeIf(::isBundleComplete)
         }.getOrNull()
     }
@@ -39,93 +39,7 @@ class OverlayModelBundleRepositoryImpl @Inject constructor(
         return getActiveBundleInfo()
     }
 
-    override suspend fun downloadBundle(): Result<OverlayModelBundleInfo> = withContext(Dispatchers.IO) {
-        if (manifestUrl.isBlank()) {
-            return@withContext Result.failure(
-                IllegalStateException("Overlay model manifest URL is not configured.")
-            )
-        }
-
-        runCatching {
-            bundleDir.mkdirs()
-            val manifestJson = downloadText(manifestUrl)
-            val bundleInfo = manifestJson.toBundleInfo(manifestUrl)
-            val writtenFiles = mutableListOf<File>()
-
-            try {
-                bundleInfo.requiredAssetPaths.forEach { assetPath ->
-                    writtenFiles += downloadAsset(assetPath)
-                }
-
-                if (!isBundleComplete(bundleInfo)) {
-                    throw IllegalStateException("Overlay model bundle is incomplete after download.")
-                }
-
-                File(bundleDir, MANIFEST_FILE_NAME).writeText(manifestJson)
-            } catch (error: Exception) {
-                writtenFiles.forEach { it.delete() }
-                File(bundleDir, MANIFEST_FILE_NAME).delete()
-                throw error
-            }
-            bundleInfo
-        }
-    }
-
-    private fun downloadAsset(path: String): File {
-        val source = if (path.startsWith("http://") || path.startsWith("https://")) {
-            path
-        } else {
-            URL(URL(manifestUrl), path).toString()
-        }
-        val target = File(bundleDir, path.substringAfterLast('/'))
-        val tempTarget = File(target.parentFile, "${target.name}.part")
-
-        URL(source).openConnection().let { connection ->
-            connection as HttpURLConnection
-            connection.connectTimeout = CONNECTION_TIMEOUT_MS
-            connection.readTimeout = READ_TIMEOUT_MS
-            connection.requestMethod = "GET"
-            connection.connect()
-            if (connection.responseCode !in 200..299) {
-                throw IllegalStateException("Failed to download overlay asset: $source")
-            }
-            tempTarget.outputStream().use { output ->
-                connection.inputStream.use { input -> input.copyTo(output) }
-            }
-            connection.disconnect()
-        }
-        if (tempTarget.length() <= 0L) {
-            tempTarget.delete()
-            throw IllegalStateException("Downloaded overlay asset is empty: $source")
-        }
-        if (target.exists() && !target.delete()) {
-            tempTarget.delete()
-            throw IllegalStateException("Failed to replace existing overlay asset: ${target.name}")
-        }
-        if (!tempTarget.renameTo(target)) {
-            tempTarget.delete()
-            throw IllegalStateException("Failed to finalize overlay asset download: ${target.name}")
-        }
-        return target
-    }
-
-    private fun downloadText(url: String): String {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = CONNECTION_TIMEOUT_MS
-        connection.readTimeout = READ_TIMEOUT_MS
-        connection.requestMethod = "GET"
-        connection.connect()
-        return try {
-            if (connection.responseCode !in 200..299) {
-                throw IllegalStateException("Failed to download overlay manifest: $url")
-            }
-            connection.inputStream.bufferedReader().use { it.readText() }
-        } finally {
-            connection.disconnect()
-        }
-    }
-
-    private fun String.toBundleInfo(defaultManifestUrl: String): OverlayModelBundleInfo {
+    private fun String.toBundleInfo(): OverlayModelBundleInfo {
         val json = JSONObject(this)
         return OverlayModelBundleInfo(
             bundleVersion = json.optString("bundleVersion", "overlay-bundle-v1"),
@@ -151,7 +65,7 @@ class OverlayModelBundleRepositoryImpl @Inject constructor(
                 json.optInt("inputSizeStage2", 512)
             ),
             onnx = json.optJSONObject("onnx").toOnnxRuntimeContract(),
-            manifestUrl = defaultManifestUrl
+            manifestUrl = null
         )
     }
 
@@ -225,7 +139,5 @@ class OverlayModelBundleRepositoryImpl @Inject constructor(
 
     companion object {
         private const val MANIFEST_FILE_NAME = "bundle.json"
-        private const val CONNECTION_TIMEOUT_MS = 15_000
-        private const val READ_TIMEOUT_MS = 30_000
     }
 }

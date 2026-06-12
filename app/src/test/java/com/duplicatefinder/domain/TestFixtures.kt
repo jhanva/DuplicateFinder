@@ -14,7 +14,6 @@ import com.duplicatefinder.domain.model.OverlayDetection
 import com.duplicatefinder.domain.model.OverlayKind
 import com.duplicatefinder.domain.model.OverlayRegion
 import com.duplicatefinder.domain.model.ScanMode
-import com.duplicatefinder.domain.model.ScanProgress
 import com.duplicatefinder.domain.model.TrashItem
 import com.duplicatefinder.domain.repository.ImageRepository
 import com.duplicatefinder.domain.repository.OverlayModelBundleInfo
@@ -78,8 +77,6 @@ open class BaseImageRepositoryFake : ImageRepository {
         limit: Int,
         offset: Int
     ): List<ImageItem> = emptyList()
-
-    override fun scanImagesWithProgress(): Flow<ScanProgress> = flowOf()
 
     override suspend fun getImageById(id: Long): ImageItem? = null
 
@@ -188,7 +185,7 @@ open class BaseOverlayRepositoryFake : OverlayRepository {
     var detectCallCount: Int = 0
 
     override suspend fun getCachedDetections(
-        imageIds: List<Long>,
+        images: List<ImageItem>,
         modelVersion: String
     ): Map<Long, OverlayDetection> = emptyMap()
 
@@ -205,22 +202,10 @@ open class BaseOverlayRepositoryFake : OverlayRepository {
 
 open class BaseOverlayModelBundleRepositoryFake : OverlayModelBundleRepository {
     var activeBundleInfo: OverlayModelBundleInfo? = null
-    var downloadConfigured: Boolean = false
-    var downloadResult: Result<OverlayModelBundleInfo> = Result.failure(
-        IllegalStateException("Bundle download not configured")
-    )
-    var downloadCallCount: Int = 0
-
-    override fun isDownloadConfigured(): Boolean = downloadConfigured
 
     override suspend fun getActiveBundleInfo(): OverlayModelBundleInfo? = activeBundleInfo
 
     override suspend fun ensureBundleAvailable(): OverlayModelBundleInfo? = activeBundleInfo
-
-    override suspend fun downloadBundle(): Result<OverlayModelBundleInfo> {
-        downloadCallCount += 1
-        return downloadResult
-    }
 }
 
 open class BaseTrashRepositoryFake : TrashRepository {

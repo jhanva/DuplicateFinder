@@ -5,8 +5,6 @@ import com.duplicatefinder.domain.model.DuplicateGroup
 import com.duplicatefinder.domain.model.FilterCriteria
 import com.duplicatefinder.domain.model.ImageHashUpdate
 import com.duplicatefinder.domain.model.ImageItem
-import com.duplicatefinder.domain.model.ScanProgress
-import kotlinx.coroutines.flow.Flow
 
 interface ImageRepository {
     suspend fun getAllImages(folders: Set<String> = emptySet()): List<ImageItem>
@@ -15,8 +13,6 @@ interface ImageRepository {
         limit: Int,
         offset: Int
     ): List<ImageItem>
-
-    fun scanImagesWithProgress(): Flow<ScanProgress>
 
     suspend fun getImageById(id: Long): ImageItem?
 

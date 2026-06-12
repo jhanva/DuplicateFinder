@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import com.duplicatefinder.data.local.db.dao.OverlayDetectionDao
 import com.duplicatefinder.data.local.db.entities.OverlayDetectionEntity
-import com.duplicatefinder.data.media.MediaStoreDataSource
 import com.duplicatefinder.domain.model.DetectionStage
 import com.duplicatefinder.domain.model.ImageItem
 import com.duplicatefinder.domain.model.OverlayDetection
@@ -14,10 +13,13 @@ import com.duplicatefinder.domain.repository.OverlayModelBundleRepository
 import com.duplicatefinder.domain.repository.OverlayRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,19 +27,18 @@ import javax.inject.Singleton
 class OverlayRepositoryImpl @Inject constructor(
     private val overlayDetectionDao: OverlayDetectionDao,
     @ApplicationContext private val context: Context,
-    private val mediaStoreDataSource: MediaStoreDataSource,
     private val overlayModelBundleRepository: OverlayModelBundleRepository,
     private val overlayOnnxRuntime: OverlayOnnxRuntime
 ) : OverlayRepository {
 
     override suspend fun getCachedDetections(
-        imageIds: List<Long>,
+        images: List<ImageItem>,
         modelVersion: String
     ): Map<Long, OverlayDetection> = withContext(Dispatchers.IO) {
-        if (imageIds.isEmpty()) return@withContext emptyMap()
+        if (images.isEmpty()) return@withContext emptyMap()
 
-        val imagesById = mediaStoreDataSource.getImagesByIds(imageIds).associateBy { it.id }
-        overlayDetectionDao.getByImageIds(imageIds)
+        val imagesById = images.associateBy { it.id }
+        overlayDetectionDao.getByImageIds(imagesById.keys.toList())
             .asSequence()
             .filter { it.modelVersion == modelVersion }
             .mapNotNull { entity ->
@@ -55,9 +56,27 @@ class OverlayRepositoryImpl @Inject constructor(
         images: List<ImageItem>,
         modelVersion: String
     ): List<OverlayDetection> = withContext(Dispatchers.Default) {
+        if (images.isEmpty()) return@withContext emptyList()
+
         val activeBundle = overlayModelBundleRepository.getActiveBundleInfo()
             ?.takeIf { it.bundleVersion == modelVersion }
-        images.map { image -> detectOverlay(image, modelVersion, activeBundle) }
+
+        // Decode + inference per image is CPU-bound; fan the batch out over a
+        // small worker pool. OrtSession.run is thread-safe, and the cap keeps
+        // peak bitmap/tensor memory bounded even on 8-core devices.
+        val results = arrayOfNulls<OverlayDetection>(images.size)
+        val nextIndex = AtomicInteger(0)
+        List(detectionParallelism()) {
+            launch {
+                while (true) {
+                    val index = nextIndex.getAndIncrement()
+                    if (index >= images.size) break
+                    results[index] = detectOverlay(images[index], modelVersion, activeBundle)
+                }
+            }
+        }.joinAll()
+
+        results.filterNotNull()
     }
 
     override suspend fun saveDetections(detections: List<OverlayDetection>) {
@@ -86,19 +105,13 @@ class OverlayRepositoryImpl @Inject constructor(
         image: ImageItem,
         modelVersion: String,
         activeBundle: com.duplicatefinder.domain.repository.OverlayModelBundleInfo?
-    ): OverlayDetection {
+    ): OverlayDetection? {
         val analysis = runCatching {
             analyzeImageContent(
                 image = image,
                 activeBundle = activeBundle
             )
-        }.getOrDefault(
-            OverlayImageAnalysis.analyze(
-                pixels = IntArray(MIN_ANALYSIS_DIMENSION * MIN_ANALYSIS_DIMENSION) { DEFAULT_PIXEL },
-                width = MIN_ANALYSIS_DIMENSION,
-                height = MIN_ANALYSIS_DIMENSION
-            )
-        )
+        }.getOrNull() ?: return null
 
         return OverlayDetection(
             image = image,
@@ -238,7 +251,9 @@ class OverlayRepositoryImpl @Inject constructor(
 
     companion object {
         private const val MAX_ANALYSIS_DIMENSION = 384
-        private const val MIN_ANALYSIS_DIMENSION = 16
-        private const val DEFAULT_PIXEL = -9671572
+
+        private fun detectionParallelism(): Int {
+            return Runtime.getRuntime().availableProcessors().coerceIn(2, 4)
+        }
     }
 }

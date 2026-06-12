@@ -6,14 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Test
-import java.io.BufferedReader
-import java.io.File
-import java.io.InputStreamReader
-import java.net.ServerSocket
-import java.net.Socket
 import java.nio.file.Files
-import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.concurrent.thread
 
 class OverlayModelBundleRepositoryImplTest {
 
@@ -34,10 +27,7 @@ class OverlayModelBundleRepositoryImplTest {
             """.trimIndent()
         )
 
-        val repository = OverlayModelBundleRepositoryImpl(
-            manifestUrl = "https://example.com/bundle.json",
-            bundleDir = bundleDir
-        )
+        val repository = OverlayModelBundleRepositoryImpl(bundleDir = bundleDir)
 
         val activeBundle = kotlinx.coroutines.runBlocking { repository.getActiveBundleInfo() }
 
@@ -46,51 +36,50 @@ class OverlayModelBundleRepositoryImplTest {
     }
 
     @Test
-    fun `download bundle stores detector assets and ignores optional inpainter asset`() {
-        val bundleDir = Files.createTempDirectory("overlay-bundle-download").toFile()
-        val server = SimpleHttpServer(
-            responses = mapOf(
-                "/bundle.json" to """
-                    {
-                      "bundleVersion": "overlay-bundle-v2",
-                      "runtime": "onnxruntime-android",
-                      "textDetectorPath": "ppocrv5_mobile_det.onnx",
-                      "maskRefinerEncoderPath": "mobile_sam_encoder.onnx",
-                      "maskRefinerDecoderPath": "mobile_sam_decoder.onnx",
-                      "$optionalInpainterKey": "aot_gan.onnx",
-                      "inputSizeTextDetector": 256,
-                      "inputSizeMaskRefiner": 512
-                    }
-                """.trimIndent().toByteArray(),
-                "/ppocrv5_mobile_det.onnx" to byteArrayOf(1, 2, 3),
-                "/mobile_sam_encoder.onnx" to byteArrayOf(4, 5, 6),
-                "/mobile_sam_decoder.onnx" to byteArrayOf(7, 8, 9)
-            )
+    fun `get active bundle returns null when manifest is missing`() {
+        val bundleDir = Files.createTempDirectory("overlay-bundle-no-manifest").toFile()
+
+        val repository = OverlayModelBundleRepositoryImpl(bundleDir = bundleDir)
+
+        val activeBundle = kotlinx.coroutines.runBlocking { repository.getActiveBundleInfo() }
+
+        assertNull(activeBundle)
+        bundleDir.deleteRecursively()
+    }
+
+    @Test
+    fun `get active bundle returns sideloaded bundle when manifest and assets are complete`() {
+        val bundleDir = Files.createTempDirectory("overlay-bundle-sideload").toFile()
+        bundleDir.resolve("bundle.json").writeText(
+            """
+            {
+              "bundleVersion": "overlay-bundle-v2",
+              "runtime": "onnxruntime-android",
+              "textDetectorPath": "ppocrv5_mobile_det.onnx",
+              "maskRefinerEncoderPath": "mobile_sam_encoder.onnx",
+              "maskRefinerDecoderPath": "mobile_sam_decoder.onnx",
+              "$optionalInpainterKey": "aot_gan.onnx",
+              "inputSizeTextDetector": 256,
+              "inputSizeMaskRefiner": 512
+            }
+            """.trimIndent()
         )
+        bundleDir.resolve("ppocrv5_mobile_det.onnx").writeBytes(byteArrayOf(1, 2, 3))
+        bundleDir.resolve("mobile_sam_encoder.onnx").writeBytes(byteArrayOf(4, 5, 6))
+        bundleDir.resolve("mobile_sam_decoder.onnx").writeBytes(byteArrayOf(7, 8, 9))
 
-        try {
-            val repository = OverlayModelBundleRepositoryImpl(
-                manifestUrl = "${server.baseUrl}/bundle.json",
-                bundleDir = bundleDir
-            )
+        val repository = OverlayModelBundleRepositoryImpl(bundleDir = bundleDir)
 
-            val downloaded = kotlinx.coroutines.runBlocking { repository.downloadBundle() }
-            val active = kotlinx.coroutines.runBlocking { repository.getActiveBundleInfo() }
+        val activeBundle = kotlinx.coroutines.runBlocking { repository.getActiveBundleInfo() }
 
-            val bundleInfo = downloaded.getOrNull()
-            assertNotNull(downloaded.exceptionOrNull()?.toString(), bundleInfo)
-            assertEquals("overlay-bundle-v2", bundleInfo?.bundleVersion)
-            assertEquals(OverlayModelRuntime.ONNX_RUNTIME_ANDROID, bundleInfo?.runtime)
-            assertEquals(bundleInfo, active)
-            assertEquals(true, File(bundleDir, "bundle.json").exists())
-            assertEquals(true, File(bundleDir, "ppocrv5_mobile_det.onnx").exists())
-            assertEquals(true, File(bundleDir, "mobile_sam_encoder.onnx").exists())
-            assertEquals(true, File(bundleDir, "mobile_sam_decoder.onnx").exists())
-            assertEquals(false, File(bundleDir, "aot_gan.onnx").exists())
-        } finally {
-            server.close()
-            bundleDir.deleteRecursively()
-        }
+        assertNotNull(activeBundle)
+        assertEquals("overlay-bundle-v2", activeBundle?.bundleVersion)
+        assertEquals(OverlayModelRuntime.ONNX_RUNTIME_ANDROID, activeBundle?.runtime)
+        assertEquals(256, activeBundle?.inputSizeTextDetector)
+        assertEquals(512, activeBundle?.inputSizeMaskRefiner)
+        assertNull(activeBundle?.manifestUrl)
+
+        bundleDir.deleteRecursively()
     }
 
     @Test
@@ -135,10 +124,7 @@ class OverlayModelBundleRepositoryImplTest {
         bundleDir.resolve("mobile_sam_decoder.onnx").writeBytes(byteArrayOf(3))
         bundleDir.resolve("migan.onnx").writeBytes(byteArrayOf(4))
 
-        val repository = OverlayModelBundleRepositoryImpl(
-            manifestUrl = "https://example.com/bundle.json",
-            bundleDir = bundleDir
-        )
+        val repository = OverlayModelBundleRepositoryImpl(bundleDir = bundleDir)
 
         val activeBundle = kotlinx.coroutines.runBlocking { repository.getActiveBundleInfo() }
 
@@ -153,64 +139,5 @@ class OverlayModelBundleRepositoryImplTest {
         assertEquals(3, activeBundle?.requiredAssetPaths?.size)
 
         bundleDir.deleteRecursively()
-    }
-
-    private class SimpleHttpServer(
-        private val responses: Map<String, ByteArray>
-    ) : AutoCloseable {
-        private val serverSocket = ServerSocket(0)
-        private val running = AtomicBoolean(true)
-        private val thread = thread(start = true, isDaemon = true) {
-            while (running.get()) {
-                val socket = try {
-                    serverSocket.accept()
-                } catch (_: Exception) {
-                    null
-                } ?: continue
-
-                socket.use(::handleConnection)
-            }
-        }
-
-        val baseUrl: String = "http://127.0.0.1:${serverSocket.localPort}"
-
-        override fun close() {
-            running.set(false)
-            serverSocket.close()
-            thread.join(2_000)
-        }
-
-        private fun handleConnection(socket: Socket) {
-            val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
-            val requestLine = reader.readLine() ?: return
-            while (reader.readLine()?.isNotEmpty() == true) {
-                // Drain headers.
-            }
-
-            val path = requestLine.split(' ').getOrNull(1) ?: "/"
-            val body = responses[path]
-            val output = socket.getOutputStream()
-            if (body == null) {
-                output.write(
-                    (
-                        "HTTP/1.1 404 Not Found\r\n" +
-                            "Content-Length: 0\r\n" +
-                            "Connection: close\r\n\r\n"
-                        ).toByteArray()
-                )
-                output.flush()
-                return
-            }
-
-            output.write(
-                (
-                    "HTTP/1.1 200 OK\r\n" +
-                        "Content-Length: ${body.size}\r\n" +
-                        "Connection: close\r\n\r\n"
-                    ).toByteArray()
-            )
-            output.write(body)
-            output.flush()
-        }
     }
 }

@@ -8,9 +8,7 @@ class EnsureOverlayModelBundleUseCase @Inject constructor(
     private val bundleRepository: OverlayModelBundleRepository
 ) {
 
-    suspend operator fun invoke(
-        allowDownload: Boolean
-    ): EnsureOverlayModelBundleResult {
+    suspend operator fun invoke(): EnsureOverlayModelBundleResult {
         val activeBundle = bundleRepository.getActiveBundleInfo()
         if (activeBundle != null) {
             return EnsureOverlayModelBundleResult(
@@ -19,34 +17,9 @@ class EnsureOverlayModelBundleUseCase @Inject constructor(
             )
         }
 
-        if (!bundleRepository.isDownloadConfigured()) {
-            return EnsureOverlayModelBundleResult(
-                status = EnsureOverlayModelBundleStatus.MISSING_CONFIGURATION,
-                errorMessage = MISSING_MANIFEST_CONFIGURATION_MESSAGE
-            )
-        }
-
-        if (!allowDownload) {
-            return EnsureOverlayModelBundleResult(
-                status = EnsureOverlayModelBundleStatus.MISSING_CONFIGURATION,
-                errorMessage = BUNDLE_NOT_AVAILABLE_LOCALLY_MESSAGE
-            )
-        }
-
-        val downloadResult = bundleRepository.downloadBundle()
-        return downloadResult.fold(
-            onSuccess = { bundleInfo ->
-                EnsureOverlayModelBundleResult(
-                    status = EnsureOverlayModelBundleStatus.DOWNLOADED,
-                    bundleInfo = bundleInfo
-                )
-            },
-            onFailure = { error ->
-                EnsureOverlayModelBundleResult(
-                    status = EnsureOverlayModelBundleStatus.FAILED,
-                    errorMessage = error.message
-                )
-            }
+        return EnsureOverlayModelBundleResult(
+            status = EnsureOverlayModelBundleStatus.MISSING_BUNDLE,
+            errorMessage = BUNDLE_NOT_AVAILABLE_LOCALLY_MESSAGE
         )
     }
 }
@@ -59,13 +32,10 @@ data class EnsureOverlayModelBundleResult(
 
 enum class EnsureOverlayModelBundleStatus {
     AVAILABLE,
-    DOWNLOADED,
-    MISSING_CONFIGURATION,
-    FAILED
+    MISSING_BUNDLE
 }
 
-private const val MISSING_MANIFEST_CONFIGURATION_MESSAGE =
-    "Overlay model manifest URL is not configured in this build. Rebuild the app with OVERLAY_MODEL_MANIFEST_URL or the overlayModelManifestUrl Gradle property."
-
 private const val BUNDLE_NOT_AVAILABLE_LOCALLY_MESSAGE =
-    "Overlay model bundle is not available locally. Enable downloads or ship the bundle with the app."
+    "Overlay model bundle is not installed on this device. The app is fully offline: " +
+        "place the bundle files and bundle.json in the app's overlay_models/current folder. " +
+        "Until then, the built-in heuristic analysis is used."

@@ -52,6 +52,7 @@ import com.duplicatefinder.R
 import com.duplicatefinder.presentation.components.ConfirmDeleteDialog
 import com.duplicatefinder.presentation.components.DuplicateGroupCard
 import com.duplicatefinder.presentation.components.FilterBottomSheet
+import com.duplicatefinder.presentation.components.ScanProgressIndicator
 import com.duplicatefinder.util.extension.formatFileSize
 import kotlinx.coroutines.launch
 
@@ -179,9 +180,17 @@ fun DuplicatesScreen(
         ) {
             when {
                 uiState.isLoading || uiState.isDeleting -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center)
-                    )
+                    val progress = uiState.scanProgress
+                    if (progress != null) {
+                        ScanProgressIndicator(
+                            progress = progress,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    } else {
+                        CircularProgressIndicator(
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    }
                 }
 
                 uiState.isEmpty -> {

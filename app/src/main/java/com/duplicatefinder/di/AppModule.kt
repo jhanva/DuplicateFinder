@@ -3,7 +3,6 @@ package com.duplicatefinder.di
 import android.content.Context
 import android.os.Build
 import com.duplicatefinder.R
-import com.duplicatefinder.BuildConfig
 import com.duplicatefinder.data.local.datastore.SettingsDataStore
 import com.duplicatefinder.data.media.MediaStoreDataSource
 import com.duplicatefinder.presentation.screens.overlay.SamsungGalleryEditIntentFactory
@@ -70,11 +69,6 @@ object AppModule {
     ): ImageProcessor {
         return ImageProcessor(context)
     }
-
-    @Provides
-    @Singleton
-    @Named("overlayModelManifestUrl")
-    fun provideOverlayModelManifestUrl(): String = BuildConfig.OVERLAY_MODEL_MANIFEST_URL
 
     @Provides
     @Singleton

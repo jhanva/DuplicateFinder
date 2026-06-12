@@ -5,13 +5,6 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-val overlayModelManifestUrl = providers.gradleProperty("overlayModelManifestUrl")
-    .orElse(providers.environmentVariable("OVERLAY_MODEL_MANIFEST_URL"))
-    .orElse("")
-    .get()
-    .replace("\\", "\\\\")
-    .replace("\"", "\\\"")
-
 android {
     namespace = "com.duplicatefinder"
     compileSdk = 34
@@ -22,7 +15,6 @@ android {
         targetSdk = 34
         versionCode = 4
         versionName = "1.1.0"
-        buildConfigField("String", "OVERLAY_MODEL_MANIFEST_URL", "\"$overlayModelManifestUrl\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -35,7 +27,8 @@ android {
             applicationIdSuffix = ".debug"
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

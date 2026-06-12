@@ -20,9 +20,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.duplicatefinder.domain.model.ImageItem
+
+// Fixed decode size for grid cells so scrolling an 80k+ library never decodes
+// full-resolution photos and Coil cache keys stay stable.
+private const val GRID_THUMBNAIL_SIZE_PX = 512
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -52,7 +58,10 @@ fun ImageCard(
             )
     ) {
         AsyncImage(
-            model = image.uri,
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(image.uri)
+                .size(GRID_THUMBNAIL_SIZE_PX)
+                .build(),
             contentDescription = image.name,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
