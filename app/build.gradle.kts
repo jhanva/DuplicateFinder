@@ -110,6 +110,9 @@ dependencies {
     // Coil for images
     implementation("io.coil-kt:coil-compose:2.5.0")
 
+    // Lottie for vector animations (offline, bundled JSON in res/raw)
+    implementation("com.airbnb.android:lottie-compose:6.3.0")
+
     // WorkManager for background tasks
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Storage
@@ -33,11 +32,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.duplicatefinder.R
+import com.duplicatefinder.presentation.components.BrandLottie
 import com.duplicatefinder.presentation.components.ScanProgressIndicator
 import com.duplicatefinder.util.extension.formatFileSize
 import com.duplicatefinder.util.extension.pluralize
@@ -101,6 +103,13 @@ fun ScanScreen(
                 }
 
                 else -> {
+                    BrandLottie(
+                        resId = R.raw.scan_loader,
+                        modifier = Modifier.size(140.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     ScanProgressIndicator(
                         progress = uiState.scanProgress,
                         modifier = Modifier.fillMaxWidth()
@@ -131,11 +140,10 @@ private fun ScanCompleteContent(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            imageVector = Icons.Default.CheckCircle,
+        Image(
+            painter = painterResource(R.drawable.illus_all_clean),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(80.dp)
+            modifier = Modifier.size(150.dp)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
