@@ -13,8 +13,8 @@ android {
         applicationId = "com.duplicatefinder"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.1.0"
+        versionCode = 5
+        versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -22,13 +22,28 @@ android {
         }
     }
 
+    signingConfigs {
+        // Stable, repo-committed signing key so every APK (any build, any
+        // machine) shares one signature. This lets sideloaded updates install
+        // over a previous version without uninstalling first. Debug-grade key:
+        // not a secret, mirrors Android's public default debug keystore.
+        create("shared") {
+            storeFile = file("shared.keystore")
+            storePassword = "android"
+            keyAlias = "duplicatefinder"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
+            signingConfig = signingConfigs.getByName("shared")
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("shared")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

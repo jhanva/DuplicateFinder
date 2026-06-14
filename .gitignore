@@ -63,6 +63,9 @@ captures/
 #*.keystore
 *.jks
 *.keystore
+# Shared debug-grade signing key, intentionally committed so every build shares
+# one signature and sideloaded updates install without uninstalling. Not a secret.
+!app/shared.keystore
 key.properties
 keystore.properties
 secrets.properties
