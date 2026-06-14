@@ -8,6 +8,10 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 import java.nio.file.Files
 
+private object NoOpAssetInstaller : OverlayModelAssetInstaller {
+    override suspend fun installIfNeeded() = Unit
+}
+
 class OverlayModelBundleRepositoryImplTest {
 
     private val optionalInpainterKey = "inpaint" + "erPath"
@@ -27,7 +31,10 @@ class OverlayModelBundleRepositoryImplTest {
             """.trimIndent()
         )
 
-        val repository = OverlayModelBundleRepositoryImpl(bundleDir = bundleDir)
+        val repository = OverlayModelBundleRepositoryImpl(
+            bundleDir = bundleDir,
+            assetInstaller = NoOpAssetInstaller
+        )
 
         val activeBundle = kotlinx.coroutines.runBlocking { repository.getActiveBundleInfo() }
 
@@ -39,7 +46,10 @@ class OverlayModelBundleRepositoryImplTest {
     fun `get active bundle returns null when manifest is missing`() {
         val bundleDir = Files.createTempDirectory("overlay-bundle-no-manifest").toFile()
 
-        val repository = OverlayModelBundleRepositoryImpl(bundleDir = bundleDir)
+        val repository = OverlayModelBundleRepositoryImpl(
+            bundleDir = bundleDir,
+            assetInstaller = NoOpAssetInstaller
+        )
 
         val activeBundle = kotlinx.coroutines.runBlocking { repository.getActiveBundleInfo() }
 
@@ -68,7 +78,10 @@ class OverlayModelBundleRepositoryImplTest {
         bundleDir.resolve("mobile_sam_encoder.onnx").writeBytes(byteArrayOf(4, 5, 6))
         bundleDir.resolve("mobile_sam_decoder.onnx").writeBytes(byteArrayOf(7, 8, 9))
 
-        val repository = OverlayModelBundleRepositoryImpl(bundleDir = bundleDir)
+        val repository = OverlayModelBundleRepositoryImpl(
+            bundleDir = bundleDir,
+            assetInstaller = NoOpAssetInstaller
+        )
 
         val activeBundle = kotlinx.coroutines.runBlocking { repository.getActiveBundleInfo() }
 
@@ -78,6 +91,45 @@ class OverlayModelBundleRepositoryImplTest {
         assertEquals(256, activeBundle?.inputSizeTextDetector)
         assertEquals(512, activeBundle?.inputSizeMaskRefiner)
         assertNull(activeBundle?.manifestUrl)
+
+        bundleDir.deleteRecursively()
+    }
+
+    @Test
+    fun `get active bundle accepts a detector-only bundle without a mask refiner`() {
+        val bundleDir = Files.createTempDirectory("overlay-bundle-detector-only").toFile()
+        bundleDir.resolve("bundle.json").writeText(
+            """
+            {
+              "bundleVersion": "overlay-ppocrv4-det-v1",
+              "runtime": "onnxruntime-android",
+              "textDetectorPath": "text_detector.onnx",
+              "inputSizeTextDetector": 512,
+              "onnx": {
+                "detector": {
+                  "inputName": "x",
+                  "outputName": "sigmoid_0.tmp_0",
+                  "outputFormat": "heatmap",
+                  "confidenceThreshold": 0.3
+                }
+              }
+            }
+            """.trimIndent()
+        )
+        bundleDir.resolve("text_detector.onnx").writeBytes(byteArrayOf(1, 2, 3))
+
+        val repository = OverlayModelBundleRepositoryImpl(
+            bundleDir = bundleDir,
+            assetInstaller = NoOpAssetInstaller
+        )
+
+        val activeBundle = kotlinx.coroutines.runBlocking { repository.getActiveBundleInfo() }
+
+        assertNotNull(activeBundle)
+        assertEquals("overlay-ppocrv4-det-v1", activeBundle?.bundleVersion)
+        assertEquals(false, activeBundle?.hasMaskRefiner)
+        assertNull(activeBundle?.maskRefinerEncoderPath)
+        assertEquals(1, activeBundle?.requiredAssetPaths?.size)
 
         bundleDir.deleteRecursively()
     }
@@ -124,7 +176,10 @@ class OverlayModelBundleRepositoryImplTest {
         bundleDir.resolve("mobile_sam_decoder.onnx").writeBytes(byteArrayOf(3))
         bundleDir.resolve("migan.onnx").writeBytes(byteArrayOf(4))
 
-        val repository = OverlayModelBundleRepositoryImpl(bundleDir = bundleDir)
+        val repository = OverlayModelBundleRepositoryImpl(
+            bundleDir = bundleDir,
+            assetInstaller = NoOpAssetInstaller
+        )
 
         val activeBundle = kotlinx.coroutines.runBlocking { repository.getActiveBundleInfo() }
 

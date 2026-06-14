@@ -1,0 +1,15 @@
+{
+  "bundleVersion": "overlay-ppocrv4-det-v1",
+  "runtime": "onnxruntime-android",
+  "textDetectorPath": "text_detector.onnx",
+  "inputSizeTextDetector": 512,
+  "onnx": {
+    "detector": {
+      "inputName": "x",
+      "outputName": "sigmoid_0.tmp_0",
+      "outputFormat": "heatmap",
+      "confidenceThreshold": 0.3,
+      "minRegionAreaRatio": 0.0025
+    }
+  }
+}

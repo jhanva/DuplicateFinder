@@ -74,15 +74,20 @@ data class OverlayModelBundleInfo(
     val bundleVersion: String,
     val runtime: OverlayModelRuntime,
     val textDetectorPath: String,
-    val maskRefinerEncoderPath: String,
-    val maskRefinerDecoderPath: String,
+    // The mask refiner (SAM-style encoder/decoder) is an optional second stage.
+    // A detector-only bundle is valid: detection falls back to stage-1 regions.
+    val maskRefinerEncoderPath: String?,
+    val maskRefinerDecoderPath: String?,
     val inputSizeTextDetector: Int,
     val inputSizeMaskRefiner: Int,
     val onnx: OverlayOnnxRuntimeContract = OverlayOnnxRuntimeContract(),
     val manifestUrl: String? = null
 ) {
+    val hasMaskRefiner: Boolean
+        get() = !maskRefinerEncoderPath.isNullOrBlank() && !maskRefinerDecoderPath.isNullOrBlank()
+
     val requiredAssetPaths: List<String>
-        get() = listOf(
+        get() = listOfNotNull(
             textDetectorPath,
             maskRefinerEncoderPath,
             maskRefinerDecoderPath

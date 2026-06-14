@@ -36,6 +36,5 @@ enum class EnsureOverlayModelBundleStatus {
 }
 
 private const val BUNDLE_NOT_AVAILABLE_LOCALLY_MESSAGE =
-    "Overlay model bundle is not installed on this device. The app is fully offline: " +
-        "place the bundle files and bundle.json in the app's overlay_models/current folder. " +
-        "Until then, the built-in heuristic analysis is used."
+    "Overlay model could not be loaded. Falling back to the built-in heuristic analysis. " +
+        "The detection model ships inside the app and runs fully offline."

@@ -22,10 +22,15 @@ import javax.inject.Singleton
  */
 @Singleton
 class OverlayModelBundleRepositoryImpl @Inject constructor(
-    @Named("overlayModelBundleDir") private val bundleDir: File
+    @Named("overlayModelBundleDir") private val bundleDir: File,
+    private val assetInstaller: OverlayModelAssetInstaller
 ) : OverlayModelBundleRepository {
 
     override suspend fun getActiveBundleInfo(): OverlayModelBundleInfo? = withContext(Dispatchers.IO) {
+        // Make sure the model that ships in the APK is unpacked locally before
+        // we look for it; on first run this copies it into bundleDir.
+        assetInstaller.installIfNeeded()
+
         val manifestFile = File(bundleDir, MANIFEST_FILE_NAME)
         if (!manifestFile.exists()) return@withContext null
 
@@ -52,10 +57,10 @@ class OverlayModelBundleRepositoryImpl @Inject constructor(
                 ?: json.getString("detectorStage1Path"),
             maskRefinerEncoderPath = json.optString("maskRefinerEncoderPath")
                 .takeIf { it.isNotBlank() }
-                ?: json.getString("detectorStage2Path"),
+                ?: json.optString("detectorStage2Path").takeIf { it.isNotBlank() },
             maskRefinerDecoderPath = json.optString("maskRefinerDecoderPath")
                 .takeIf { it.isNotBlank() }
-                ?: json.getString("detectorStage2Path"),
+                ?: json.optString("detectorStage2Path").takeIf { it.isNotBlank() },
             inputSizeTextDetector = json.optInt(
                 "inputSizeTextDetector",
                 json.optInt("inputSizeStage1", 512)

@@ -69,7 +69,9 @@ class OverlayOnnxRuntime @Inject constructor(
                         regions = stage1Regions,
                         stage = DetectionStage.STAGE_1_CANDIDATE
                     )
-                    if (stage1Regions.isEmpty()) {
+                    // Detector-only bundles (no mask refiner shipped) stop at
+                    // stage 1; the heatmap regions are the result.
+                    if (stage1Regions.isEmpty() || !bundleInfo.hasMaskRefiner) {
                         return@useResult stage1Analysis
                     }
 
@@ -124,8 +126,9 @@ class OverlayOnnxRuntime @Inject constructor(
             targetSize = bundleInfo.inputSizeMaskRefiner
         )
         return try {
-            val encoderSession = loadSession(bundleInfo.maskRefinerEncoderPath)
-            val decoderSession = loadSession(bundleInfo.maskRefinerDecoderPath)
+            // Guarded by hasMaskRefiner in analyze(); paths are non-null here.
+            val encoderSession = loadSession(bundleInfo.maskRefinerEncoderPath!!)
+            val decoderSession = loadSession(bundleInfo.maskRefinerDecoderPath!!)
             val squareRegions = prepared.projectRegions(detectorRegions)
             val imageTensor = createImageTensor(
                 bitmap = prepared.squareBitmap,

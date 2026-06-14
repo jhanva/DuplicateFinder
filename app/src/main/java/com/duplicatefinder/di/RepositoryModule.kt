@@ -1,6 +1,8 @@
 package com.duplicatefinder.di
 
 import com.duplicatefinder.data.repository.ImageRepositoryImpl
+import com.duplicatefinder.data.repository.OverlayModelAssetInstaller
+import com.duplicatefinder.data.repository.OverlayModelAssetInstallerImpl
 import com.duplicatefinder.data.repository.OverlayModelBundleRepositoryImpl
 import com.duplicatefinder.data.repository.OverlayRepositoryImpl
 import com.duplicatefinder.data.repository.QualityRepositoryImpl
@@ -51,6 +53,12 @@ abstract class RepositoryModule {
     abstract fun bindOverlayModelBundleRepository(
         impl: OverlayModelBundleRepositoryImpl
     ): OverlayModelBundleRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindOverlayModelAssetInstaller(
+        impl: OverlayModelAssetInstallerImpl
+    ): OverlayModelAssetInstaller
 
     @Binds
     @Singleton
