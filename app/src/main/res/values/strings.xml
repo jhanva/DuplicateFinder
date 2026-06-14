@@ -30,6 +30,20 @@
     <string name="home_review_resolution">Review Low Resolution</string>
     <string name="home_review_watermarks">Review Watermarks</string>
 
+    <!-- Home — hero + review modes -->
+    <string name="home_photos_ready">%1$s photos ready</string>
+    <string name="home_no_photos">No photos found</string>
+    <string name="home_last_scan_savings">Last scan %1$s · %2$s recoverable</string>
+    <string name="home_review_modes">Review modes</string>
+    <string name="home_mode_duplicates">Duplicates</string>
+    <string name="home_mode_duplicates_sub">Exact &amp; similar copies</string>
+    <string name="home_mode_duplicates_hint">Run a scan to find copies</string>
+    <string name="home_mode_quality_sub">Blurry &amp; low-detail shots</string>
+    <string name="home_mode_resolution_sub">Small, low-resolution images</string>
+    <string name="home_mode_watermarks_sub">Visible signatures &amp; overlays</string>
+    <string name="home_folders">Folders</string>
+    <string name="home_select_folders_hint">Select folders below to scan</string>
+
     <!-- Scan Screen -->
     <string name="scan_title">Scanning</string>
     <string name="scan_loading">Loading images…</string>

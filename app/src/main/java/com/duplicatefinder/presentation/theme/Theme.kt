@@ -72,7 +72,9 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun DuplicateFinderTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    // Off by default so the custom teal/indigo brand shows instead of the
+    // wallpaper-derived Material You palette.
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
