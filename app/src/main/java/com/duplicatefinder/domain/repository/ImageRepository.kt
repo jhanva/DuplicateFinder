@@ -44,4 +44,6 @@ interface ImageRepository {
     suspend fun getFolders(): List<String>
 
     suspend fun getImageCount(folders: Set<String> = emptySet()): Int
+
+    suspend fun getSizeCounts(folders: Set<String> = emptySet()): Map<Long, Int>
 }

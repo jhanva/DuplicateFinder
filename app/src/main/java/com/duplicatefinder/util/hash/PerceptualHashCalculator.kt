@@ -79,11 +79,16 @@ class PerceptualHashCalculator @Inject constructor(
     }
 
     private fun toGrayscale(bitmap: Bitmap): Array<DoubleArray> {
-        val result = Array(HASH_SIZE) { DoubleArray(HASH_SIZE) }
+        // Read all pixels in one call; per-pixel getPixel() would be HASH_SIZE^2
+        // JNI round-trips per image (~1k × every image in the library).
+        val pixels = IntArray(HASH_SIZE * HASH_SIZE)
+        bitmap.getPixels(pixels, 0, HASH_SIZE, 0, 0, HASH_SIZE, HASH_SIZE)
 
+        val result = Array(HASH_SIZE) { DoubleArray(HASH_SIZE) }
+        var index = 0
         for (y in 0 until HASH_SIZE) {
             for (x in 0 until HASH_SIZE) {
-                val pixel = bitmap.getPixel(x, y)
+                val pixel = pixels[index++]
                 val r = Color.red(pixel)
                 val g = Color.green(pixel)
                 val b = Color.blue(pixel)

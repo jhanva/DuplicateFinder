@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.duplicatefinder.domain.model.ScanPhase
 import com.duplicatefinder.domain.model.ScanProgress
+import com.duplicatefinder.util.extension.pluralize
 
 @Composable
 fun ScanProgressIndicator(
@@ -46,17 +47,29 @@ fun ScanProgressIndicator(
         Spacer(modifier = Modifier.height(8.dp))
 
         if (progress.phase != ScanPhase.IDLE && progress.phase != ScanPhase.COMPLETE) {
-            LinearProgressIndicator(
-                progress = { animatedProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp),
-            )
+            if (progress.isIndeterminate) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp),
+                )
+            } else {
+                LinearProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp),
+                )
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "${progress.current} / ${progress.total}",
+                text = if (progress.isIndeterminate) {
+                    if (progress.total > 0) progress.total.pluralize("image") else "Working..."
+                } else {
+                    "${progress.current} / ${progress.total}"
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

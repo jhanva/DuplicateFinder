@@ -109,6 +109,8 @@ open class BaseImageRepositoryFake : ImageRepository {
     override suspend fun getFolders(): List<String> = emptyList()
 
     override suspend fun getImageCount(folders: Set<String>): Int = 0
+
+    override suspend fun getSizeCounts(folders: Set<String>): Map<Long, Int> = emptyMap()
 }
 
 class FakeSettingsRepository(

@@ -45,6 +45,9 @@ class ScanImagesUseCaseTest {
 
             override suspend fun getImageCount(folders: Set<String>): Int = allImages.size
 
+            override suspend fun getSizeCounts(folders: Set<String>): Map<Long, Int> =
+                allImages.groupingBy { it.size }.eachCount()
+
             override suspend fun getImagesBatch(
                 folders: Set<String>,
                 limit: Int,

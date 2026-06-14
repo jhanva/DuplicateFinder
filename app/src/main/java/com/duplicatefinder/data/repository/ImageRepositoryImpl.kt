@@ -375,6 +375,10 @@ class ImageRepositoryImpl @Inject constructor(
     override suspend fun getImageCount(folders: Set<String>): Int {
         return mediaStoreDataSource.getImageCount(folders)
     }
+
+    override suspend fun getSizeCounts(folders: Set<String>): Map<Long, Int> {
+        return mediaStoreDataSource.getSizeCounts(folders)
+    }
 }
 
 private const val HASH_QUERY_BATCH_SIZE = 900

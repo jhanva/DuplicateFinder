@@ -227,6 +227,33 @@ class MediaStoreDataSource @Inject constructor(
         )?.use { it.count } ?: 0
     }
 
+    /**
+     * Aggregates how many images share each file size, projecting only the SIZE
+     * column. This is the cheap index pass the scan uses to decide which images
+     * are worth an MD5 (only sizes with a collision can be exact duplicates).
+     * The summed values also yield the total, so the scan avoids a separate
+     * full-row pass just to count and bucket sizes.
+     */
+    suspend fun getSizeCounts(folders: Set<String> = emptySet()): Map<Long, Int> =
+        withContext(Dispatchers.IO) {
+            val (selection, selectionArgs) = buildFolderSelection(folders)
+            val counts = HashMap<Long, Int>()
+            contentResolver.query(
+                collection,
+                arrayOf(MediaStore.Images.Media.SIZE),
+                selection,
+                selectionArgs,
+                null
+            )?.use { cursor ->
+                val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
+                while (cursor.moveToNext()) {
+                    val size = cursor.getLong(sizeColumn)
+                    counts[size] = (counts[size] ?: 0) + 1
+                }
+            }
+            counts
+        }
+
     private fun buildFolderSelection(folders: Set<String>): Pair<String?, Array<String>?> {
         if (folders.isEmpty()) return null to null
 

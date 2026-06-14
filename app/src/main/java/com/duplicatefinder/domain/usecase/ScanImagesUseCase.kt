@@ -8,6 +8,7 @@ import com.duplicatefinder.domain.model.ScanProgress
 import com.duplicatefinder.domain.repository.ImageRepository
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -35,7 +36,12 @@ class ScanImagesUseCase @Inject constructor(
     ): Flow<Pair<ScanProgress, List<ImageItem>>> = channelFlow<Pair<ScanProgress, List<ImageItem>>> {
         send(ScanProgress(ScanPhase.LOADING, 0, 0) to emptyList<ImageItem>())
 
-        val total = imageRepository.getImageCount(folders)
+        // Single lightweight index pass: aggregate counts per file size straight
+        // from MediaStore (SIZE column only) instead of materializing every
+        // ImageItem just to learn which sizes collide. The summed counts also
+        // give the total, so no separate getImageCount() row pass is needed.
+        val sizeCounts = imageRepository.getSizeCounts(folders)
+        val total = sizeCounts.values.sum()
         val computeSimilar = scanMode == ScanMode.EXACT_AND_SIMILAR
 
         if (total == 0) {
@@ -44,30 +50,12 @@ class ScanImagesUseCase @Inject constructor(
             return@channelFlow
         }
 
-        send(ScanProgress(ScanPhase.INDEXING, 0, total) to emptyList<ImageItem>())
-
-        val sizeCounts = mutableMapOf<Long, Int>()
-        var offset = 0
-        var indexed = 0
-        while (offset < total) {
-            val batch = imageRepository.getImagesBatch(
-                folders = folders,
-                limit = BATCH_SIZE,
-                offset = offset
-            )
-            if (batch.isEmpty()) break
-
-            batch.forEach { image ->
-                sizeCounts[image.size] = (sizeCounts[image.size] ?: 0) + 1
-            }
-            indexed += batch.size
-            send(ScanProgress(ScanPhase.INDEXING, indexed, total) to emptyList<ImageItem>())
-            offset += batch.size
-        }
-
         val finalImages = mutableListOf<ImageItem>()
         val completed = AtomicInteger(0)
-        offset = 0
+        // Hash persistence runs off the critical path; collected here so the scan
+        // can await all pending Room writes before reporting completion.
+        val saveJobs = mutableListOf<Job>()
+        var offset = 0
         while (offset < total) {
             val batch = imageRepository.getImagesBatch(
                 folders = folders,
@@ -151,7 +139,9 @@ class ScanImagesUseCase @Inject constructor(
 
             val updatesToSave = hashUpdates.filterNotNull()
             if (updatesToSave.isNotEmpty()) {
-                imageRepository.saveHashes(updatesToSave)
+                // Persist in the background so the next batch starts fetching and
+                // hashing without blocking on the Room write.
+                saveJobs += launch { imageRepository.saveHashes(updatesToSave) }
             }
 
             val filteredBatch = hashedBatch.filterNotNull().let { items ->
@@ -160,6 +150,8 @@ class ScanImagesUseCase @Inject constructor(
             finalImages.addAll(filteredBatch)
             offset += batch.size
         }
+
+        saveJobs.joinAll()
 
         send(
             ScanProgress(ScanPhase.COMPLETE, total, total) to finalImages.toList()
