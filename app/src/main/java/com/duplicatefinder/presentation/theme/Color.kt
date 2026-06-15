@@ -76,6 +76,13 @@ val OnSurfaceVariantDark = Color(0xFFBEC9C7)
 val OutlineDark = Color(0xFF899392)
 val OutlineVariantDark = Color(0xFF3F4948)
 
+// Review-mode accent: watermarks (violet) — distinct from the teal/indigo/amber
+// already used by the duplicates/quality/resolution modes.
+val WatermarkContainer = Color(0xFFEADDFF)
+val OnWatermarkContainer = Color(0xFF21005D)
+val WatermarkContainerDark = Color(0xFF4F378B)
+val OnWatermarkContainerDark = Color(0xFFEADDFF)
+
 // Status colors (shared across themes)
 val Success = Color(0xFF2E7D32)
 val Warning = Color(0xFFF9A825)

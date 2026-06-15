@@ -1,6 +1,8 @@
 package com.duplicatefinder.presentation.screens.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,6 +53,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -59,6 +62,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.duplicatefinder.R
 import com.duplicatefinder.presentation.components.FolderPickerBottomSheet
 import com.duplicatefinder.presentation.components.PermissionHandler
+import com.duplicatefinder.presentation.theme.OnWatermarkContainer
+import com.duplicatefinder.presentation.theme.OnWatermarkContainerDark
+import com.duplicatefinder.presentation.theme.WatermarkContainer
+import com.duplicatefinder.presentation.theme.WatermarkContainerDark
 import com.duplicatefinder.util.extension.formatFileSize
 import com.duplicatefinder.util.extension.toRelativeTimeString
 
@@ -128,6 +135,7 @@ fun HomeScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 HeroCard(
+                    hasPhotos = uiState.totalImages > 0,
                     photosLabel = if (uiState.totalImages > 0) {
                         stringResource(
                             R.string.home_photos_ready,
@@ -203,12 +211,13 @@ fun HomeScreen(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
+                val darkTheme = isSystemInDarkTheme()
                 ReviewModeRow(
                     icon = Icons.Default.WaterDrop,
                     title = stringResource(R.string.home_review_watermarks),
                     subtitle = stringResource(R.string.home_mode_watermarks_sub),
-                    iconContainer = MaterialTheme.colorScheme.secondaryContainer,
-                    iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    iconContainer = if (darkTheme) WatermarkContainerDark else WatermarkContainer,
+                    iconTint = if (darkTheme) OnWatermarkContainerDark else OnWatermarkContainer,
                     enabled = hasFolders,
                     onClick = onReviewWatermarks
                 )
@@ -232,6 +241,7 @@ fun HomeScreen(
 
 @Composable
 private fun HeroCard(
+    hasPhotos: Boolean,
     photosLabel: String,
     secondaryLabel: String?,
     canScan: Boolean,
@@ -253,18 +263,26 @@ private fun HeroCard(
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Search,
+            if (hasPhotos) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            } else {
+                Image(
+                    painter = painterResource(R.drawable.illus_no_photos),
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(96.dp)
                 )
             }
 
